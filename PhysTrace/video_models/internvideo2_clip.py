@@ -26,7 +26,10 @@ except ImportError:                                  # transformers < 5.0 keeps 
     from transformers.modeling_utils import no_init_weights
 
 # Relative to the working directory, which every entry script sets to the repo root.
-_VENDOR_DIR = Path('AlignmentModels/InternVideo2/multi_modality')
+# NOTE: Previous path kept for rollback. The InternVideo submodule (whole repo) is checked out at
+# AlignmentModels/InternVideo2, so multi_modality sits one level deeper.
+# _VENDOR_DIR = Path('AlignmentModels/InternVideo2/multi_modality')
+_VENDOR_DIR = Path('AlignmentModels/InternVideo2/InternVideo2/multi_modality')
 if str(_VENDOR_DIR) not in sys.path:
     sys.path.insert(0, str(_VENDOR_DIR))
 
