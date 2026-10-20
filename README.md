@@ -64,12 +64,14 @@ Or clone the external repositories manually:
 # Alignment Scoring Models
 git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
 
-# Diffusion models
-git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
-git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
-
 # Alignment Scoring Models (optional)
 git clone https://github.com/OpenGVLab/InternVideo.git AlignmentModels/InternVideo2
+```
+
+```bash
+# Diffusion models (only for Section 4: Evaluation for Video Generative Models)
+git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
+git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
 ```
 
 ### c) Weight Download
@@ -98,7 +100,7 @@ hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3
 hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
 ```
 
-**Diffusion models**
+**Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
 
 ```bash
 hf download Wan-AI/Wan2.1-T2V-1.3B --revision 37ec512624d61f7aa208f7ea8140a131f93afc9a \
