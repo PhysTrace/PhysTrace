@@ -1,6 +1,8 @@
 output/*
-DiffusionModels/weights/*
-AlignmentModels/weights/*
+# DiffusionModels/weights/*
+# AlignmentModels/weights/*
+DiffusionModels/*
+AlignmentModels/*
 .nfs*
 keep
 **/__pycache__

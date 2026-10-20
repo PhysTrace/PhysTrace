@@ -61,14 +61,14 @@ git submodule update --init --remote --recursive
 Or clone the external repositories manually:
 
 ```bash
+# Alignment Scoring Models
+git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
+
 # Diffusion models
 git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
 git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
 
-# Alignment Scoring Models
-git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
-
-# optional
+# Alignment Scoring Models (optional)
 git clone https://github.com/OpenGVLab/InternVideo.git AlignmentModels/InternVideo2
 ```
 
