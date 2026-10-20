@@ -65,9 +65,11 @@ Or clone the external repositories manually:
 git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
 git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
 
-# Alignment models
-git clone https://github.com/OpenGVLab/InternVideo.git AlignmentModels/InternVideo2
+# Alignment Scoring Models
 git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
+
+# optional
+git clone https://github.com/OpenGVLab/InternVideo.git AlignmentModels/InternVideo2
 ```
 
 ### c) Weight Download
@@ -76,18 +78,22 @@ git clone https://github.com/facebookresearch/perception_models.git AlignmentMod
 hf auth login
 ```
 
-**Alignment models**
+**Alignment Scoring Models**
 
 ```bash
 hf download facebook/pe-av-large --revision perception_models --local-dir AlignmentModels/weights/PE-AV-Large
-hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
-```
 
-**Alignment models (optional)**
-
-```bash
+# optional
 hf download OpenGVLab/InternVideo2-Stage2_6B --local-dir AlignmentModels/weights/InternVideo2-Stage2
 hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 --local-dir AlignmentModels/weights/InternVideo2-CLIP
+```
+
+**MLLMs**
+
+```bash
+hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
+
+# optional
 hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
 hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
 ```
