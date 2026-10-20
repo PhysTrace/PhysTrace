@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://arxiv.org/abs/XXXX.XXXXX">
-    <img src="https://github.com/user-attachments/assets/0f78430b-34e6-497a-bcdf-a1ed5f450023" alt="Paper">
+    <img src="https://img.shields.io/badge/Paper-OpenReview-blue" alt="Paper">
   </a>
 </p>
 
@@ -10,7 +10,7 @@ Official codebase for the paper **"PhysTrace: Interpretable Temporal Evaluation 
 
 <div>
 <!-- TODO: replace with the teaser figure -->
-<img width="100%" alt="PhysTrace Overview" src="TODO_IMAGE_URL" />
+<img width="100%" alt="PhysTrace Overview" src="https://github.com/user-attachments/assets/0f78430b-34e6-497a-bcdf-a1ed5f450023" />
 </div>
 
 ## Overview
