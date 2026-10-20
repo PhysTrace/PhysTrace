@@ -1,0 +1,17 @@
+Clip {segment_number} ({start_sec:.2f}-{end_sec:.2f} s). This clip is part of a longer video of a physics experiment.
+
+Focus on solidity: two solid objects cannot be in the same place. An object that meets another solid object lands on it, rests against it, bounces off it or is deflected by it, and stays on the side it came from. Objects out of view keep their place and size. Nothing can go into another object, end up on its far side or below it by passing it, take its place, disappear where it lands, or hang in the air with nothing under it.
+
+First, name the setup of this video in your own words and use only that setup's landmark words. If this clip has no "Earlier clips" that name a solid object, "prediction" must be an exact copy of "state". Then look at every frame of this clip and write, frame by frame, each solid object you see, the exact spot where it is relative to the objects around it, what holds it up, and whether two objects overlap, or "no object". Read colors and shapes from the frames, not from the history. Many clips show only the setup, a cover, or the camera turning away; never write an object into "state" that you cannot point to in a frame.
+
+For "state": name the visible solid objects by color or material and shape, and say where each is relative to the others and what holds it up; say exactly what the frames show even if it looks impossible. If no object of interest is visible, describe the setup only, without the words "empty", "without", "gone" or "missing".
+
+For "prediction": follow the Case A / Case B rules from the system prompt. From the earlier clips alone, decide where solidity puts each object in this clip and whether that place is in view. If the arrangement is one solid objects could have, or the place is not in view, copy "state" (Case A). If the place is plainly in view and an object is buried in another, on a side or below it could only reach by passing it, in another object's place, gone from the place where it must be, or hanging with nothing under it, every prediction is a 4-to-8-word sentence naming only the history object and the one other object, with the place solidity expects (Case B), and "trusted" is false.
+
+Answer the question using the following format:
+
+<think>
+Your reasoning.
+</think>
+
+Write your final answer immediately after the </think> tag.

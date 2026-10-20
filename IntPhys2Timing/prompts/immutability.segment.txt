@@ -1,0 +1,17 @@
+Clip {segment_number} ({start_sec:.2f}-{end_sec:.2f} s). This clip is part of a longer video of a physics experiment.
+
+Focus on immutability: the same object keeps its color, shape, size and kind over time. It cannot turn into another color, another shape, another size or another kind of object, in view or out of view.
+
+First, name the setup of this video in your own words and use only that setup's landmark words. If this clip has no "Earlier clips" that name a movable object, "prediction" must be an exact copy of "state" and "trusted" is true exactly when "state" names the object. Then look for the small movable object in every frame of this clip and write, frame by frame, the exact spot where you see it with its color, shape and size next to a fixed object, or "no object". Never write an object into "state" that you cannot point to in a frame. Read its color and shape from the frames, not from the history.
+
+For "state": if the object is visible, name it with the color and shape the frames show, say where it is, and name the setup around it; if it is not visible, describe the setup only, without the words "empty", "without", "gone" or "missing".
+
+For "prediction": follow the Case A / Case B rules from the system prompt. Before you choose Case B, name the frames where the object is clearly visible and how its look differs from the history. From the earlier clips alone, take the object's color, shape and size. If the object is not in view in this clip, or it is in view looking as the history says, copy "state" (Case A). If it is clearly visible and its color, shape, size or kind differs from the history object it continues (not merely because of light, shadow or angle), every prediction is a 2-to-5-word sentence naming only the history object by its history color and shape, with no setup word (Case B).
+
+Answer the question using the following format:
+
+<think>
+Your reasoning.
+</think>
+
+Write your final answer immediately after the </think> tag.

@@ -1,0 +1,12 @@
+# Demo / Scoring
+vllm==0.19.1
+timm
+peft
+scipy
+huggingface_hub
+
+# Diffusion
+diffusers==0.40.0
+easydict
+ftfy
+imageio[ffmpeg]

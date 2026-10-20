@@ -1,0 +1,85 @@
+/* demo_dynamic's layout/theme is retained in style.css. MLLM-specific views follow. */
+#detail{display:flex;flex-direction:column;gap:14px}
+#panes.pane-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:900px){#panes.pane-grid{grid-template-columns:1fr}}
+#panes .result-panel{min-width:0}
+.result-panel svg{width:100%;display:block}
+.result-panel svg [data-segment]{cursor:pointer}
+.result-panel .segment-table td{white-space:normal;vertical-align:top;min-width:70px}
+.result-panel .segment-table .caption{min-width:200px;max-width:320px;font-size:12px}
+.segment-row{cursor:pointer}.segment-row:hover{background:var(--panel2)}
+.segment-row.anomaly{background:#3d2028}.segment-row.selected{outline:1px solid var(--accent);outline-offset:-1px}
+.result-panel details{margin-top:10px}.result-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+.result-panel .history{max-height:400px;overflow:auto}
+.result-panel .downloads{display:flex;gap:8px;flex-wrap:wrap}
+.result-summary{font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.plot-legend{font-size:11px;color:var(--dim)}
+.plot-legend .prediction{color:var(--accent)}
+#threshold{width:100px}#segment-seconds{width:56px}#mllm-frames{width:96px}
+#model-settings{overflow-wrap:anywhere}
+.prompt-card label{display:block;color:var(--dim);font-size:12px;margin-bottom:5px}
+.prompt-options{margin:10px 0}.prompt-options summary{cursor:pointer;color:var(--dim)}
+.segment-card{margin-top:12px;padding:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.segment-card.anomaly{border-color:var(--bad)}
+.segment-card p{white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0 12px}
+.segment-card h3{margin:0 0 8px;font-size:13px}
+.segment-card .score-label{color:var(--accent);font-size:12px}
+.segment-card .input-prompt{max-height:260px;overflow:auto}
+.score-plot-scroll{width:100%;min-width:0}.score-plot-scroll svg{width:100%;height:auto}.time-tick:hover text{fill:var(--accent)}
+.model-input-frames{border:1px solid var(--line);border-radius:8px;padding:10px;margin:12px 0}
+.model-input-frames h3{font-size:12px;margin:10px 0}
+.model-filmstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.model-frame{padding:0;overflow:hidden;min-width:0}
+.model-frame img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#000}
+.model-frame span{display:block;font:10px var(--mono);padding:5px 2px}
+
+/* The CLIP score comes from the previous window's prediction captions, so it sits next to the green name;
+   this window's state is yellow, the next window's prediction light blue.
+   A name and the captions under it share one color, so it is clear which name a caption belongs to. */
+.segment-card .score-state,.segment-card .state-captions{color:#fbbf24}
+.segment-card .score-source,.segment-card .source-captions{color:#34d399}
+.segment-card .score-next,.segment-card .next-captions{color:#93c5fd}
+/* The helper text beside a name does not take the caption color. */
+.segment-card .score-label .meta{color:var(--dim)}
+.segment-card .captions{margin:5px 0 12px;padding-left:34px;overflow-wrap:anywhere}
+.segment-card .captions .meta{margin-left:6px}
+.segment-card .verdict{margin-left:8px;font-size:12px}
+
+/* The table's last cell holds the previous window's prediction captions compared with this window; the score is in the cell before it.
+   Small and faint, readable without hiding the score and the window. */
+.segment-table .caption-cell{color:var(--dim);font-size:11px;line-height:1.45;
+  max-width:420px;white-space:normal}
+/* Output limit · thinking budget help: a two-line list, so only the indent and the line spacing shrink. */
+.prompt-card .limits-help{margin:6px 0;padding-left:18px}
+
+/* With several captions the table has one row per caption. The window and trusted cells span those rows (rowspan),
+   window boundaries get a thick line and captions inside one window a dotted line.
+   An outline per row would not line up with the spanned cells, so the selection is shown as a background. */
+.segment-table .segment-row td{border-bottom:1px dashed var(--line)}
+.segment-table .segment-row.seg-start td{border-top:2px solid #3a4150}
+.segment-table .segment-row.selected{outline:none}
+/* Selected window: an accent border instead of a background, so it shows on the red candidate background too; the window cell in bold. */
+.segment-table .segment-row.selected td{background:#1d3150}
+.segment-table .segment-row.selected.seg-start td{border-top:2px solid var(--accent)}
+.segment-table .segment-row.selected.seg-end td,.segment-table .segment-row.selected td[rowspan]{border-bottom:2px solid var(--accent)}
+.segment-table .segment-row.selected.seg-start td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
+.segment-table .segment-row.selected td[rowspan]{color:var(--fg);font-weight:700}
+.segment-table .segment-row.selected .caption-cell{color:var(--fg)}
+.segment-card.selected{border:2px solid var(--accent);box-shadow:0 0 0 3px rgba(91,157,255,.25)}
+.segment-card.selected h3 button{border-color:var(--accent);color:var(--accent);font-weight:700}
+.result-panel svg circle.selected{r:8px;stroke:#fff;stroke-width:2.5px}
+.segment-table .caption-no{color:var(--dim);min-width:0;width:1%}
+/* Keeps the caption cell in a half-width panel from being squeezed to a few characters by the number cells; an overflowing table scrolls sideways. */
+.result-panel .segment-table td.caption-cell{min-width:260px}
+.result-panel .segment-table td.num{min-width:0;white-space:nowrap}
+/* The adopted caption (highest per-caption score = the window score) in bold accent color instead of the faint caption color. */
+.segment-table .segment-row.adopted td:not([rowspan]){color:#34d399;font-weight:600}
+.segment-table .adopted-key{color:#34d399;text-transform:none;margin-left:6px}
+.captions li{padding:2px 0}
+.captions li+li{border-top:1px dashed var(--line)}
+.captions li.adopted{font-weight:650}
+.captions li.adopted::marker{content:'★ ' counter(list-item) '. '}
+.captions .meta{margin-left:6px}
+.captions li.adopted .meta{color:#34d399}
+#state-detail-good .captions,#state-detail-bad .captions{margin:5px 0 12px;padding-left:34px;color:var(--fg)}
+.prompt-card .help-note{margin:6px 0;padding-left:18px}

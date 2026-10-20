@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLLM Physics-Error Window Detection · IntPhys2</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/mllm.css">
+</head>
+<body>
+<header>
+  <div class="head-left"><h1>MLLM Physics-Error Window Detection</h1><span class="sub" id="head-sub">IntPhys2</span></div>
+  <form id="video-search" class="video-search" role="search">
+    <div class="video-search-controls">
+      <input id="video-search-input" type="text" aria-label="Search video name" placeholder="Search video name (.mp4 allowed)">
+      <button class="ghost" type="submit">Search</button>
+    </div>
+    <span id="video-search-status" class="meta" role="status"></span>
+  </form>
+  <div class="head-right"><div id="model-badge" class="badge loading">Loading list…</div></div>
+</header>
+<main>
+  <aside class="list-col">
+    <div class="tabs" id="attr-tabs"></div>
+    <div class="filters" id="filters"></div>
+    <div class="filters second">
+      <input id="f-text" type="text" placeholder="scene / name search">
+      <button id="reset-filters" class="ghost" type="button">Reset filters</button>
+    </div>
+    <div class="list-head"><span id="list-count" class="meta"></span></div>
+    <div class="table-wrap list-wrap"><table id="pair-table" class="tbl sortable">
+      <thead><tr id="pair-head"></tr></thead><tbody></tbody>
+    </table></div>
+  </aside>
+  <section class="detail-col">
+    <div id="empty" class="card empty-card">
+      <p>Pick a <b>video pair</b> from the list on the left.</p>
+      <p>The MLLM is called once per window and returns state captions, prediction captions and whether to trust the window (trusted).
+        Physics-error candidates are the k windows with the lowest CLIP score (this window's prediction ↔ this window's video); trusted only decides whether a window enters the history.</p>
+    </div>
+    <div id="detail" hidden>
+      <div class="card pair-card">
+        <div class="card-head"><h2 id="pair-title"></h2><div class="meta" id="pair-trial-meta"></div></div>
+        <div class="chips" id="pair-chips"></div>
+      </div>
+      <div class="top-row">
+        <div class="card prompt-card">
+          <div class="card-head"><h2>MLLM prediction &amp; window settings</h2></div>
+          <div class="ladder-opts">
+            <label>Window length (s) <input id="segment-seconds" type="number" min="0.1" step="0.1" value="2"></label>
+            <label>Hop(s) <input id="hop-seconds" type="number" min="0.1" step="0.1" value="1"></label>
+            <label>MLLM input frames <span id="mllm-frames-auto" class="meta"></span> <input id="mllm-frames" type="number" min="2" step="2" placeholder="auto"></label>
+            <label>CLIP input frames <span id="clip-frames-range" class="meta"></span> <input id="clip-frames" type="number" min="0" max="32" step="1" value="0"></label>
+          </div>
+          <ul class="meta help-note">
+            <li>MLLM frames: frames per window (even numbers only)</li>
+            <li>CLIP frames: 0 = every frame; changing it reloads CLIP</li>
+          </ul>
+          <div class="ladder-opts">
+            <label>Captions per field n <input id="num-prompts" type="number" min="1" max="8" step="1" value="1"></label>
+            <label>History windows (0 = all, -1 = none) <input id="history-windows" type="number" min="-1" step="1" value="0"></label>
+            <label>Physics-error candidates: lowest-CLIP windows k <input id="lowest-windows" type="number" min="0" step="1" value="1"></label>
+          </div>
+          <ul class="meta help-note">
+            <li>n: captions per field</li>
+            <li>History: latest trusted windows kept</li>
+            <li>k: lowest-CLIP windows shown as error candidates (0 = none)</li>
+          </ul>
+          <div class="ladder-opts">
+            <label>Output limit (tokens) <input id="max-new-tokens" type="number" min="1" step="500"></label>
+            <label>Thinking budget (tokens; 0 = uncapped) <input id="thinking-budget" type="number" min="0" step="500"></label>
+          </div>
+          <ul class="meta help-note">
+            <li>Output limit: max tokens per window, thinking + answer (max <span id="max-new-tokens-limit">–</span>)</li>
+            <li>Thinking budget: cut-off for thinking, below the output limit</li>
+          </ul>
+          <div class="field"><label for="system-prompt">MLLM system prompt (editable)</label>
+            <textarea id="system-prompt" rows="12" spellcheck="false"></textarea></div>
+          <div class="field"><label for="segment-template">Per-window input prompt (editable)</label>
+            <textarea id="segment-template" rows="9" spellcheck="false"></textarea></div>
+          <p class="hint">The output format (state / prediction caption lists, trusted) and the trusted rule are in the system prompt.<br>
+            Keep the JSON keys. An edited prompt applies to the next analysis and is stored with the trial.</p>
+          <button id="reset-prompts" class="ghost" type="button">Restore default prompts</button>
+          <div class="run-row">
+            <label class="run-target" for="run-sides"><span class="run-target-k">Run on</span>
+              <select id="run-sides">
+                <option value="good,bad">Both (Possible + Impossible)</option>
+                <option value="bad">Impossible only</option>
+                <option value="good">Possible only</option>
+              </select></label>
+            <button id="run-btn" class="primary" type="button">Analyze pair</button>
+            <span class="hint">Ctrl+Enter</span><span id="run-status" class="run-status" role="status"></span></div>
+          <p class="meta" id="run-target-note">Both videos are analyzed. Running one side takes half the time.</p>
+          <div id="progress" class="progress" hidden><span id="progress-text" class="meta"></span></div>
+        </div>
+        <div class="card scrub-card">
+          <div class="card-head"><h2>All frames <span class="hint">slider · ← → to step · click a window to jump there</span></h2></div>
+          <div id="scrub-panes" class="pane-grid"></div>
+        </div>
+      </div>
+      <div id="panes" class="pane-grid"></div>
+      <div class="card trials-card">
+        <div class="card-head"><h2>Trials <span class="hint">click a row to restore its settings and results</span></h2>
+          <div class="trial-actions"><button id="delete-trials" class="ghost danger" type="button" disabled>Delete selected</button>
+          <button id="clear-trials" class="ghost" type="button">Clear list</button></div></div>
+        <div class="table-wrap trials-wrap"><table id="trials-table" class="tbl"><thead><tr>
+          <th class="check"><input id="trials-check-all" type="checkbox" aria-label="Select all"></th><th>Time</th><th>Model</th><th>CLIP model</th><th>Window(s)</th><th>Hop(s)</th><th>CLIP frames</th><th>Lowest CLIP P</th><th>Lowest CLIP I</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div id="error" class="card error-card" hidden><div class="card-head"><h2>Error</h2>
+      <button id="error-close" class="ghost" type="button">Close</button></div><pre id="error-text"></pre></div>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

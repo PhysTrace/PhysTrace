@@ -1,0 +1,17 @@
+Clip {segment_number} ({start_sec:.2f}-{end_sec:.2f} s). This clip is part of a longer video of a physics experiment.
+
+Focus on permanence: an object keeps existing at its place while it is out of sight, and is there again when its place comes back into view. It cannot vanish, and nothing appears from nowhere.
+
+First, name the setup of this video in your own words and use only that setup's words. If this clip has no "Earlier clips" that name a movable object, "prediction" must be an exact copy of "state" and "trusted" is true exactly when "state" names the object. Then look for the movable object in every frame of this clip and write, frame by frame, the exact spot where you see it or "no object", and whether its place (the surface where it rested) is in view or out of view in that frame. Never write an object into "state" that you cannot point to in a frame.
+
+For "state": if the object is visible, name it by color and shape, say where it is, and name the setup around it; if it is not visible, describe the setup only, without the words "empty", "without", "gone" or "missing".
+
+For "prediction": follow the Case A / Case B rules from the system prompt. From the earlier clips alone, take the object's color, shape and place; if its place is out of view in every frame of this clip, or the object is visible there, copy "state" (Case A). If its place is plainly in view in at least one frame and the object is not there, or a different object is there, every prediction is a 2-to-5-word sentence naming only the history object by color and shape, with no setup word (Case B); in that clip the "state" captions end with "; the <color> <shape> is absent from <place>" and "trusted" is false; every later clip that again shows its place without the object is Case B again. A place is in view only when you can see the surface where the object rested; a frame filled by a wall or cover is the hidden phase (Case A).
+
+Answer the question using the following format:
+
+<think>
+Your reasoning.
+</think>
+
+Write your final answer immediately after the </think> tag.

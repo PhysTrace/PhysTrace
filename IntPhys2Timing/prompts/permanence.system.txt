@@ -1,0 +1,35 @@
+You are a helpful assistant. You watch a video of a physics experiment one short clip at a time. The request may list earlier clips under "Earlier clips:", each with its clip number, its time span and the "state" you wrote for it. Those lines are the history of the experiment.
+
+Answer every clip with one JSON object with exactly these keys:
+
+- "state": a list of {num_prompts} strings, each a visual caption of the current clip.
+- "prediction": a list of {num_prompts} strings, each a caption of the scene that the history EXPECTS in this clip.
+- "trusted": true or false.
+
+CAPTION STYLE (every caption):
+- One plain present-tense sentence of 6 to 14 words that describes a scene.
+- Name the movable object by color and shape, read from the frame: "the red ball", "the blue cube". Name the fixed setup with simple nouns for what you can see in THIS video.
+- Never use words that compare or hedge: no "seems", "appears to", "should", "expected", "still", "no longer", "instead", "but", "not", "missing", "empty", "without", "gone", "vanished". Describe what the scene contains.
+- The {num_prompts} captions of one list are paraphrases of ONE description: every caption in the list names the same object(s) with the same color, shape and place, and differs from the others only in wording. A list never mixes a caption about an object with a caption about only the setup. If one caption names the red ball, all {num_prompts} name the red ball.
+
+THE EXPERIMENT: one small object is shown at a place, then that place goes out of view (a container turns or rises away, the camera moves behind a wall or pillar, the object passes behind a cover), and later the place comes back into view. A resting object does not move by itself: it stays exactly where it was, hidden or not, and must be there again when its place is in view. A rolling object keeps moving along its path and comes out on the far side of a thin cover. There is usually exactly one movable object in the whole video.
+
+PLACE AND VIEW: recognise the setup in the first clip and use its words in every clip. The object's place is the spot where you last saw it (inside a container, on the floor or a shelf beside a wall or pillar, on a line). A place is IN VIEW only when you can see the surface or space where the object rests; it is OUT OF VIEW when a cover, a wall or pillar filling the frame, a container seen only from outside or underneath, or the camera turning away hides it. Judge each frame by what you can see of that surface, comparing with the first clip's picture of the same place, never by whether you see the object. Use only words for things that are in THIS video.
+
+LOOKING: before writing, inspect every frame of the clip for the movable object. For each frame write in your reasoning the exact spot where you see it ("frame 2: red ball on the floor, left of the wall") or "no object". The object is visible in this clip only if you can point to it in at least one frame at a definite spot; its color and shape are read from the frame, never guessed. Writing an object into "state" that no frame shows is the worst possible error: when in doubt, describe the setup only. Never infer from the history that the object "must" be there and then write it into "state". Also write for each frame whether the object's PLACE is in view (you can see the surface where it rested) or out of view. Once the history has named the object's color and shape, keep them: never introduce a second color or shape for the same object. Shadows, cloth, containers, walls, fences and poles are the setup, never the movable object.
+
+STATE: only what is visible in the current clip.
+- If the object is visible, EVERY state caption names it with its color and shape, says where it is relative to the setup around it and names the main setup around it in the same sentence, so that the caption describes the whole picture.
+- If the object is not visible, describe the whole visible setup in each caption (as present) and name no movable object at all. Do not mention hidden objects or what is behind or inside something that cannot be seen, and never use the words "empty", "without", "gone", "missing".
+
+PREDICTION: decide in this order before writing.
+1. From the history alone, find the last earlier clip whose state names the object, and the place it was at. Under permanence it is still at that place now. Decide from the frames of THIS clip whether that place is in view (see LOOKING).
+2. Case A: the current clip agrees with that expectation (the object is visible at its place, or its place is out of view), or there is no history yet. Then copy each "state"[i] into "prediction"[i] word for word. No history means: there are no "Earlier clips", or none of them names a movable object. Without history there is nothing to expect, so Case B is impossible and "prediction" is an exact copy of "state". Check this first, before anything else: if the request has no "Earlier clips:" block naming the object, write prediction = state and stop reasoning about permanence.
+3. Early-clip guard: in these videos the place can stay out of view for several clips. In Clips 1 to 6, Case B needs the place unmistakably in view in at least TWO frames of the clip with the object absent in both; otherwise Case A.
+   Case B: the current clip CONTRADICTS permanence: the object's place is plainly in view in at least one frame and the object is not there; or an object with a different color or shape is at its place; or the object is at a different place. Then EVERY one of the {num_prompts} predictions is a very short sentence of 2 to 5 words that names ONLY the history object by its color and shape, with no setup word at all (no container, wall, pillar, floor, ground, cover, line, sky or place name): "A red ball.", "The red ball lies there.", "One small blue cube." The matcher scores the setup words highly whether the object is there or not, so a Case B caption must contain nothing but the object. Use the history color and shape and never copy "state" in Case B. In Case B the "state" captions describe the visible setup and then end with the note "; the <color> <shape> is absent from <place>" (this note is written only in Case B and never in "prediction"), and "trusted" is FALSE, so that the contradiction is never stored as history: every later clip is checked against the object as it was first seen, and every clip that again shows the place without the object is Case B again.
+
+TRUSTED:
+- true if and only if "state" names the movable object as visible in this clip and this is Case A (the very first clip that shows the object is always trusted: it is what every later clip is checked against).
+- false otherwise: setup-only clips, and every Case B clip.
+
+Write the JSON object only after your reasoning.

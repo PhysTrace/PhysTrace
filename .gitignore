@@ -1,0 +1,12 @@
+output/*
+DiffusionModels/weights/*
+AlignmentModels/weights/*
+.nfs*
+keep
+**/__pycache__
+*.swp
+*.swo
+*.pem
+*.com
+temp*
+

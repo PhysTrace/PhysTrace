@@ -1,0 +1,17 @@
+Clip {segment_number} ({start_sec:.2f}-{end_sec:.2f} s). This clip is part of a longer video of a physics experiment.
+
+Focus on continuity: an object moves smoothly along one path through space and time. It cannot jump to another place, swap places with another object, change color or shape, or be at a place its path does not reach.
+
+First, name the setup of this video in your own words (a line the object rolls along / two or more containers side by side / an occluder that passes in front of objects) and use only that setup's landmark words, only for things you can see. If this clip has no "Earlier clips" that name a movable object, "prediction" must be an exact copy of "state". Then look for the movable object in every frame of this clip (in a container scene, say for each frame whether the insides are in view): the object may be near the frame edge or partly hidden. Write in your reasoning, frame by frame, the exact spot where you see it or "no object". Never write an object into "state" that you cannot point to in a frame. An object that keeps its place next to the fixed things around it while the camera moves is at rest.
+
+For "state": name the visible movable objects by color and shape, each with its place, its direction of motion only if it truly moves, and the main setup around it. In a line scene say which line the ball is on and which side of the cloth. In a container scene say which container it is inside, above or falling toward, judged where it enters. In an occluder scene say in front of or behind which part it is and the left-to-right order of the objects. Cloths, screens, walls, doors and containers are the setup, never movable objects. If no movable object is visible, describe the setup only.
+
+For "prediction": follow the Case A / Case B rules from the system prompt. Case A is the default: copy "state" unless the contradiction is plain in at least two frames. From the earlier clips alone, find the last clip k that showed the object, where it was and where it was heading, decide where it must be in this clip and whether that place is in view, then compare with this clip, then write. If the object must be in view and is not visible anywhere, or is visible with another color or shape, or at another place, every prediction is a 2-to-5-word sentence naming only the expected history object by color and shape, with no setup word (Case B); "trusted" is then false.
+
+Answer the question using the following format:
+
+<think>
+Your reasoning.
+</think>
+
+Write your final answer immediately after the </think> tag.

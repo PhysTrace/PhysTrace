@@ -1,0 +1,19 @@
+[submodule "DiffusionModels/Wan2.1"]
+	path = DiffusionModels/Wan2.1
+	url = https://github.com/Wan-Video/Wan2.1.git
+    ignore=all
+
+[submodule "DiffusionModels/cosmos-predict2"]
+	path = DiffusionModels/cosmos-predict2
+	url = https://github.com/nvidia-cosmos/cosmos-predict2.git
+    ignore=all
+
+[submodule "AlignmentModels/PE_AV_large"]
+    path = AlignmentModels/PE_AV_large
+    url = https://github.com/facebookresearch/perception_models.git
+    ignore = all
+
+[submodule "AlignmentModels/InternVideo2"]
+    path = AlignmentModels/InternVideo2
+    url = https://github.com/OpenGVLab/InternVideo.git
+    ignore = all
