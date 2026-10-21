@@ -85,10 +85,6 @@ hf download facebook/pe-av-large --revision perception_models --local-dir Alignm
 
 ```bash
 hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
-
-# optional
-hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
-hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
 ```
 
 **Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
@@ -106,10 +102,10 @@ M=DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World
 cp $M/tokenizer/{special_tokens_map.json,spiece.model,tokenizer.json,tokenizer_config.json} $M/text_encoder/
 ```
 
-**Alignment Scoring Models (optional)**
+**Optional Models**
 
 ```bash
-# ---- internvideo2-stage2-6b ----
+# ---- Scorer : internvideo2-stage2-6b ----
 # internvideo2-stage2
 hf download OpenGVLab/InternVideo2-Stage2_6B-224p-f4 internvideo2-s2_6b-224p-f4_with_audio_encoder.pt \
     --local-dir AlignmentModels/weights/InternVideo2-Stage2
@@ -118,7 +114,7 @@ hf download OpenGVLab/InternVideo2-Stage2_6B-224p-f4 internvideo2-s2_6b-224p-f4_
 hf download google-bert/bert-large-uncased vocab.txt tokenizer.json tokenizer_config.json config.json \
     --local-dir AlignmentModels/weights/InternVideo2-Stage2/bert-large-uncased
 
-# ---- internvideo2-clip-6b ----
+# ---- Scorer : internvideo2-clip-6b ----
 # internvideo2-stage2 (same as above; skip if already downloaded)
 hf download OpenGVLab/InternVideo2-Stage2_6B-224p-f4 internvideo2-s2_6b-224p-f4_with_audio_encoder.pt \
     --local-dir AlignmentModels/weights/InternVideo2-Stage2
@@ -134,6 +130,12 @@ hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 6B_clip.pth \
 # LLaMA tokenizer
 hf download hfl/chinese-alpaca-lora-7b tokenizer.model tokenizer_config.json special_tokens_map.json \
     --local-dir AlignmentModels/weights/InternVideo2-CLIP/tokenizer
+
+# ---- MLLM : Qwen3-VL-32B-Thinking ----
+hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
+
+# ---- MLLM : Cosmos-Reason2-8B ----
+hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
 ```
 
 ### d) Data Download: IntPhys2 (for IntPhys2-Timing)
