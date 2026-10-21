@@ -73,7 +73,7 @@ class Demo:
                                       sample_frames=self.clip_frames != ALL_FRAMES)
         if self.predictor is None:
             self.predictor = self._timed(
-                'mllm (vllm)', VideoPredictor, self.args.backend, str(self.args.mllm_model),
+                'mllm (vllm)', VideoPredictor, self.args.backend, str(self.args.mllm_model_dir),
                 window_seconds=self.args.window_seconds, num_frames=self.args.mllm_frames,
                 max_new_tokens=self.args.max_new_tokens, seed=self.args.seed,
                 temperature=self.args.temperature, gpu_fraction=self.args.gpu_fraction,
@@ -161,7 +161,7 @@ def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
     """Which models to load and how much they may generate."""
     group = parser.add_argument_group('MLLM (vLLM; pick its GPU with CUDA_VISIBLE_DEVICES)')
     group.add_argument('--mllm-backend', choices=sorted(BACKENDS), default=DEFAULT_BACKEND)
-    group.add_argument('--mllm-model', type=Path,
+    group.add_argument('--mllm-model-dir', type=Path,
                        help="model directory, if it is not the backend's own under AlignmentModels/weights/")
     group.add_argument('--mllm-frames', type=int, default=DEFAULT_MLLM_FRAMES,
                        help='even frame count for every window, whatever its length; 0 = 4 per second of window. '
@@ -181,8 +181,8 @@ def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
 
     clip = parser.add_argument_group('CLIP (video-text scorer)')
     clip.add_argument('--clip-model', choices=sorted(CLIP_MODELS), default=DEFAULT_CLIP_MODEL,
-                      help='pe-av-large: every frame of a window, ModernBERT text tower, captions up to 512 '
-                           'tokens; internvideo2-stage2-6b: BERT-large text tower, up to 40 tokens; '
+                      help='pe-av-large: every frame of a window, ModernBERT text tower, captions up to 512 tokens; '
+                           'internvideo2-stage2-6b: BERT-large text tower, up to 40 tokens; '
                            'internvideo2-clip-6b: InternVL-C/LLaMA text tower, up to 80 tokens')
     # The 32B backends' 62GiB of weights leave no room for CLIP's 25GiB: give them two devices and cuda:1.
     clip.add_argument('--clip-device', default='cuda:0',
@@ -205,8 +205,8 @@ def parse_args(argv=None) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     args.backend = BACKENDS[args.mllm_backend]
-    args.mllm_model = (args.mllm_model.expanduser().resolve() if args.mllm_model
-                       else Path(args.backend.path(Path('AlignmentModels/weights'))))
+    args.mllm_model_dir = (args.mllm_model_dir.expanduser().resolve() if args.mllm_model_dir
+                           else Path(args.backend.path(Path('AlignmentModels/weights'))))
     args.output = args.output.expanduser().resolve()
     args.video_dir = main_videos_dir(args.intphys2_dir.expanduser().resolve())
     args.npz_dir = default_cache_dir(args.video_dir)
@@ -245,7 +245,7 @@ def main() -> None:
     # A plain `kill` would skip atexit and orphan vLLM's engine process on the GPU.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     args = parse_args()
-    print(f'[MLLM] loading {args.mllm_model} (vllm) and {CLIP_MODELS[args.clip_model].name}…', flush=True)
+    print(f'[MLLM] loading {args.mllm_model_dir} (vllm) and {CLIP_MODELS[args.clip_model].name}…', flush=True)
     demo = Demo(args)
     demo.load_models()
     print('[MLLM] models ready', flush=True)

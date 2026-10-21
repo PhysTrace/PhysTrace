@@ -25,11 +25,7 @@ try:
 except ImportError:                                  # transformers < 5.0 keeps it in modeling_utils
     from transformers.modeling_utils import no_init_weights
 
-# Relative to the working directory, which every entry script sets to the repo root.
-# NOTE: Previous path kept for rollback. The InternVideo submodule (whole repo) is checked out at
-# AlignmentModels/InternVideo2, so multi_modality sits one level deeper.
-# _VENDOR_DIR = Path('AlignmentModels/InternVideo2/multi_modality')
-_VENDOR_DIR = Path('AlignmentModels/InternVideo2/InternVideo2/multi_modality')
+_VENDOR_DIR = Path('AlignmentModels/InternVideo2/multi_modality')
 if str(_VENDOR_DIR) not in sys.path:
     sys.path.insert(0, str(_VENDOR_DIR))
 
@@ -37,25 +33,16 @@ logger = logging.getLogger(__name__)
 
 MODEL_NAME = 'InternVideo2-CLIP-6B'
 
-VISION_REPO = 'OpenGVLab/InternVideo2-Stage2_6B-224p-f4'
 VISION_FILE = 'internvideo2-s2_6b-224p-f4_with_audio_encoder.pt'
-TEXT_TOWER_REPO = 'OpenGVLab/InternVL'
 TEXT_TOWER_FILE = 'internvl_c_13b_224px.pth'
-CLIP_DELTA_REPO = 'OpenGVLab/InternVideo2-CLIP-6B-224p-f8'
 CLIP_DELTA_FILE = '6B_clip.pth'
-TOKENIZER_REPO = 'hfl/chinese-alpaca-lora-7b'
 TOKENIZER_FILES = ['tokenizer.model', 'tokenizer_config.json', 'special_tokens_map.json']
 CLIP_MODEL_DIR = Path('AlignmentModels/weights/InternVideo2-CLIP')
-LLAMA_DIR = CLIP_MODEL_DIR / 'tokenizer'
+# The vision checkpoint is the stage-2 one, shared with the stage-2 scorer rather than copied (29 GB).
+VISION_DIR = Path('AlignmentModels/weights/InternVideo2-Stage2')
 _MIN_SANE_VOCAB = 1000
 _TOKENIZER_WAIT_S = 120
 _MAX_REPORTED_KEYS = 10
-
-MODEL_SOURCES = {
-    'vision (InternVideo2 stage2 6B)': f'{VISION_REPO}/{VISION_FILE}',
-    'text tower (InternVL-C 13B)': f'{TEXT_TOWER_REPO}/{TEXT_TOWER_FILE}',
-    'clip delta': f'{CLIP_DELTA_REPO}/{CLIP_DELTA_FILE}',
-}
 
 LLAMA_7B_CONFIG = {
     'architectures': ['LlamaForCausalLM'],
@@ -168,21 +155,15 @@ _ALLOWED_UNEXPECTED = re.compile(r'^text_encoder\.transformer\.layers\.\d+\.self
 _TEXT_COLLAPSE_COSINE = 0.97
 
 
-def _local_model_root() -> Path:
-    """The directory the CLIP checkpoints are read from."""
-    return Path(os.environ.get('PHYSTRACE_CLIP_MODEL_DIR') or CLIP_MODEL_DIR)
-
-
-def _hf_download(repo_id: str, filename: str) -> str:
-    """Resolve one checkpoint to its local path; the repo id is kept for provenance only.
+def _local_checkpoint_path(filename: str, root: Path = CLIP_MODEL_DIR) -> str:
+    """Resolve one checkpoint file to its local path, under `root` (the CLIP model directory by default).
 
     Raises:
         FileNotFoundError: If the file has not been staged locally.
     """
-    del repo_id
-    path = _local_model_root() / filename
+    path = root / filename
     if not path.is_file():
-        raise FileNotFoundError(f'Local CLIP file missing: {path}; check PHYSTRACE_CLIP_MODEL_DIR')
+        raise FileNotFoundError(f'Local CLIP file missing: {path}')
     return str(path)
 
 
@@ -227,7 +208,7 @@ def _prepare_llama_dir() -> str:
     Raises:
         FileNotFoundError: If a tokenizer file has not been staged locally.
     """
-    llama_dir = _local_model_root() / 'tokenizer'
+    llama_dir = CLIP_MODEL_DIR / 'tokenizer'
     for filename in TOKENIZER_FILES:
         if not (llama_dir / filename).is_file():
             raise FileNotFoundError(f'Local tokenizer missing: {llama_dir / filename}')
@@ -243,9 +224,9 @@ def _prepare_llama_dir() -> str:
 def _fetch_internvideo2clip_6b() -> dict:
     """Resolve every checkpoint and the tokenizer to a local path."""
     return {
-        'vision_ckpt_path': _hf_download(VISION_REPO, VISION_FILE),
-        'text_ckpt_path': _hf_download(TEXT_TOWER_REPO, TEXT_TOWER_FILE),
-        'extra_ckpt_path': _hf_download(CLIP_DELTA_REPO, CLIP_DELTA_FILE),
+        'vision_ckpt_path': _local_checkpoint_path(VISION_FILE, VISION_DIR),
+        'text_ckpt_path': _local_checkpoint_path(TEXT_TOWER_FILE),
+        'extra_ckpt_path': _local_checkpoint_path(CLIP_DELTA_FILE),
         'llama_path': _prepare_llama_dir(),
     }
 
@@ -408,8 +389,6 @@ class InternVideo2CLIP6BScorer:
 
     def __init__(self, device: str = 'cuda', num_frames: int = 8, dtype: torch.dtype = torch.bfloat16):
         print(f'[{MODEL_NAME}]')
-        for label, source in MODEL_SOURCES.items():
-            print(f'  {label}: {source}')
 
         paths = _fetch_internvideo2clip_6b()
 

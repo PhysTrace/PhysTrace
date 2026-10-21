@@ -136,7 +136,7 @@ def _add_analysis_arguments(parser: argparse.ArgumentParser) -> None:
 
     mllm = parser.add_argument_group('MLLM (vLLM; pick its GPU with CUDA_VISIBLE_DEVICES)')
     mllm.add_argument('--mllm-backend', choices=sorted(BACKENDS), default=DEFAULT_BACKEND)
-    mllm.add_argument('--mllm-model', type=Path, help="model directory, if it is not the backend's own")
+    mllm.add_argument('--mllm-model-dir', type=Path, help="model directory, if it is not the backend's own")
     mllm.add_argument('--mllm-frames', type=int, default=DEFAULT_MLLM_FRAMES,
                       help='even frame count for every window, whatever its length; 0 = 4 per second of window')
     mllm.add_argument('--max-new-tokens', type=int, default=DEFAULT_MAX_NEW_TOKENS,
@@ -180,8 +180,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.threads < 1:
         parser.error('--threads must be >= 1')
     args.backend = BACKENDS[args.mllm_backend]
-    args.mllm_model = (args.mllm_model.expanduser().resolve() if args.mllm_model
-                       else Path(args.backend.path(Path('AlignmentModels/weights'))))
+    args.mllm_model_dir = (args.mllm_model_dir.expanduser().resolve() if args.mllm_model_dir
+                           else Path(args.backend.path(Path('AlignmentModels/weights'))))
     args.video_dir = main_videos_dir(args.intphys2_dir.expanduser().resolve())
     args.gt_csv = args.gt_csv.expanduser().resolve()
     args.npz_dir = default_cache_dir(args.video_dir)
@@ -293,7 +293,7 @@ def load_models(args: argparse.Namespace) -> tuple[VideoPredictor, ClipScorer]:
     print(f'[load] {args.clip_model}: {time.perf_counter() - started:.2f}s', flush=True)
     started = time.perf_counter()
     predictor = VideoPredictor(
-        args.backend, str(args.mllm_model), window_seconds=args.window_seconds, num_frames=args.mllm_frames,
+        args.backend, str(args.mllm_model_dir), window_seconds=args.window_seconds, num_frames=args.mllm_frames,
         max_new_tokens=args.max_new_tokens, seed=args.seed, temperature=args.temperature,
         gpu_fraction=args.gpu_fraction, thinking_budget=args.thinking_budget, max_model_len=args.max_model_len)
     print(f'[load] mllm (vllm): {time.perf_counter() - started:.2f}s', flush=True)

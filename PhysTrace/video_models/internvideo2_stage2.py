@@ -13,13 +13,18 @@ pooling `clip_projector`) is the stage-2 `PretrainInternVideo2.forward` minus th
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import importlib
+import importlib.machinery
 import logging
-import os
 from pathlib import Path
 import re
+import sys
+import types
 from typing import Any
+from unittest.mock import patch
 
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -27,26 +32,91 @@ from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 from transformers import BertConfig, BertModel, BertTokenizerFast
 
-from PhysTrace.video_models.internvideo2_clip import (
-    CLIP_MODEL_DIR,
-    HAS_FLASH_ATTN,
-    downsample_frames,
-    frames_to_tensor,
-    internvideo2_clip_vision,
-    no_weight_init,
-    sample_indices,  # noqa: F401 - ClipScorer reads the sampler from whichever loader it built
-)
+try:
+    from transformers.initialization import no_init_weights
+except ImportError:                                  # transformers < 5.0 keeps it in modeling_utils
+    from transformers.modeling_utils import no_init_weights
+
+_VENDOR_DIR = Path('AlignmentModels/InternVideo2/multi_modality')
+if str(_VENDOR_DIR) not in sys.path:
+    sys.path.insert(0, str(_VENDOR_DIR))
 
 logger = logging.getLogger(__name__)
 
 MODEL_NAME = 'InternVideo2-Stage2-6B'
 
-CHECKPOINT_REPO = 'OpenGVLab/InternVideo2-Stage2_6B-224p-f4'
+CHECKPOINT_DIR = Path('AlignmentModels/weights/InternVideo2-Stage2')
 CHECKPOINT_FILE = 'internvideo2-s2_6b-224p-f4_with_audio_encoder.pt'
-TOKENIZER_REPO = 'google-bert/bert-large-uncased'
-# The checkpoint is shared with the CLIP scorer rather than copied: it is the same 29 GB file.
-CHECKPOINT_DIR = CLIP_MODEL_DIR
-TOKENIZER_DIR = CLIP_MODEL_DIR.parent / 'InternVideo2-Stage2' / 'bert-large-uncased'
+TOKENIZER_DIR = CHECKPOINT_DIR / 'bert-large-uncased'
+
+# The only flash_attn names the vendor modules import at module level.
+_FLASH_ATTN_STUBS = {
+    'flash_attn': (),
+    'flash_attn.modules': (),
+    'flash_attn.modules.mlp': ('FusedMLP',),
+    'flash_attn.ops': (),
+    'flash_attn.ops.rms_norm': ('DropoutAddRMSNorm',),
+    'flash_attn.flash_attn_interface': ('flash_attn_varlen_qkvpacked_func',),
+    'flash_attn.bert_padding': ('unpad_input', 'pad_input'),
+}
+
+
+def _raises_unavailable(name: str):
+    """A stand-in for a flash_attn symbol that refuses to run."""
+    def fail(*args, **kwargs):
+        raise RuntimeError(f'{name} requires flash_attn, which is not installed; '
+                           'this model was built for the naive attention path')
+
+    return fail
+
+
+def _flash_attn_available() -> bool:
+    """True if flash_attn is really installed."""
+    try:
+        import flash_attn  # noqa: F401, PLC0415 - probing whether it is installed
+    except ImportError:
+        return False
+    return True
+
+
+HAS_FLASH_ATTN = _flash_attn_available()
+
+
+@contextmanager
+def _flash_attn_stubs():
+    """Make the flash_attn names importable, for the vendor import below and nothing else.
+
+    The vendor modules import FusedMLP, DropoutAddRMSNorm and the flash kernels at module
+    level even when the model is configured not to use them. The stubs are removed again on
+    the way out because `sys.modules` is process-wide: left in place they tell every other
+    library that flash_attn is installed, and vLLM then dies on `flash_attn.ops.triton`.
+    """
+    installed = []
+    for name, members in _FLASH_ATTN_STUBS.items():
+        if name in sys.modules:
+            continue   # a real flash_attn, or someone else's stub: leave it alone
+        module = types.ModuleType(name)
+        # A spec lets `from flash_attn.x import y` resolve. No __file__ and no __version__
+        # keeps transformers' own probe answering "not installed", which is the truth.
+        module.__spec__ = importlib.machinery.ModuleSpec(name, loader=None)
+        for member in members:
+            setattr(module, member, _raises_unavailable(member))
+        sys.modules[name] = module
+        installed.append(name)
+        parent, _, leaf = name.rpartition('.')
+        if parent:
+            setattr(sys.modules[parent], leaf, module)
+    try:
+        yield
+    finally:
+        for name in reversed(installed):
+            sys.modules.pop(name, None)
+
+
+with _flash_attn_stubs():
+    vision = importlib.import_module('models.backbones.internvideo2.internvideo2_clip_vision')
+    _pos_embed = importlib.import_module('models.backbones.internvideo2.pos_embed')
+
 
 # From the checkpoint's own training config (`model.text_encoder`, `inputs`).
 TEXT_FUSION_LAYER = 19
@@ -62,10 +132,6 @@ _IMAGENET_STD = (0.229, 0.224, 0.225)
 _TEXT_COLLAPSE_COSINE = 0.97
 _MAX_REPORTED_KEYS = 10
 
-MODEL_SOURCES = {
-    'vision + text (InternVideo2 stage2 6B)': f'{CHECKPOINT_REPO}/{CHECKPOINT_FILE}',
-    'tokenizer (BERT-large uncased)': TOKENIZER_REPO,
-}
 
 # The 6B values of upstream `pretrain_internvideo2_6b_patch14_224`.
 _VISION_KWARGS = dict(
@@ -76,8 +142,6 @@ _VISION_KWARGS = dict(
     tubelet_size=1, sep_pos_embed=False, use_checkpoint=False, checkpoint_num=0,
 )
 
-_pos_embed = importlib.import_module('models.backbones.internvideo2.pos_embed')
-
 
 def file_identity(path) -> dict:
     """Path, size and mtime: enough to notice a checkpoint swapped underneath a cache."""
@@ -86,15 +150,52 @@ def file_identity(path) -> dict:
     return dict(path=str(path), size=stat.st_size, mtime_ns=stat.st_mtime_ns)
 
 
+def sample_indices(total: int, num_frames: int) -> list[int]:
+    """Interval midpoints over `total` frames; short clips repeat the last index.
+
+    Raises:
+        ValueError: If there is no frame to sample.
+    """
+    if total == 0:
+        raise ValueError('got 0 frames')
+    num_intervals = min(num_frames, total)
+    bounds = np.linspace(start=0, stop=total, num=num_intervals + 1).astype(int)
+    indices = [int(bounds[i] + bounds[i + 1] - 1) // 2 for i in range(num_intervals)]
+    return indices + [indices[-1]] * (num_frames - len(indices))
+
+
+def downsample_frames(frames: list, num_frames: int) -> list:
+    """Sample interval midpoints; pad short clips with the last sampled frame."""
+    return [frames[index] for index in sample_indices(len(frames), num_frames)]
+
+
+def frames_to_tensor(frames: list, transform, device: str = 'cuda') -> torch.Tensor:
+    """Convert BGR frames to a normalized [1, T, C, H, W] tensor."""
+    rgb = np.stack([np.ascontiguousarray(frame[:, :, ::-1]) for frame in frames])
+    tube = torch.from_numpy(rgb).permute(0, 3, 1, 2)
+    return transform(tube).unsqueeze(0).to(device)
+
+
+@contextmanager
+def no_weight_init():
+    """Skip checkpoint-replaced initialization; patches are process-wide."""
+    def keep_tensor(tensor, *args, **kwargs):
+        return tensor
+
+    # The vision module holds its own imported reference to timm's initializer.
+    with no_init_weights(), patch.object(vision, 'trunc_normal_', keep_tensor):
+        yield
+
+
 def _checkpoint_path() -> Path:
     """The stage-2 checkpoint.
 
     Raises:
         FileNotFoundError: If it has not been staged locally.
     """
-    path = Path(os.environ.get('PHYSTRACE_STAGE2_CKPT') or CHECKPOINT_DIR / CHECKPOINT_FILE)
+    path = CHECKPOINT_DIR / CHECKPOINT_FILE
     if not path.is_file():
-        raise FileNotFoundError(f'Stage2 checkpoint missing: {path}; set PHYSTRACE_STAGE2_CKPT')
+        raise FileNotFoundError(f'Stage2 checkpoint missing: {path}')
     return path
 
 
@@ -104,10 +205,10 @@ def _tokenizer_dir() -> Path:
     Raises:
         FileNotFoundError: If its vocabulary has not been staged locally.
     """
-    path = Path(os.environ.get('PHYSTRACE_STAGE2_TOKENIZER_DIR') or TOKENIZER_DIR)
+    path = TOKENIZER_DIR
     if not (path / 'vocab.txt').is_file():
         raise FileNotFoundError(f'BERT tokenizer missing: {path / "vocab.txt"}; '
-                                f'download {TOKENIZER_REPO} there or set PHYSTRACE_STAGE2_TOKENIZER_DIR')
+                                'stage a bert-large-uncased tokenizer there')
     return path
 
 
@@ -130,7 +231,7 @@ class Stage2DualEncoder(nn.Module):
 
     def __init__(self, bert_config: BertConfig, num_frames: int):
         super().__init__()
-        self.vision_encoder = internvideo2_clip_vision.InternVideo2(num_frames=num_frames, **_VISION_KWARGS)
+        self.vision_encoder = vision.InternVideo2(num_frames=num_frames, **_VISION_KWARGS)
         self.vision_proj = nn.Linear(_VISION_KWARGS['clip_embed_dim'], _VISION_KWARGS['clip_embed_dim'])
         self.text_encoder = BertModel(bert_config, add_pooling_layer=False)
         self.text_proj = nn.Linear(bert_config.hidden_size, _VISION_KWARGS['clip_embed_dim'])
@@ -189,8 +290,6 @@ class InternVideo2Stage2Scorer:
 
     def __init__(self, device: str = 'cuda', num_frames: int = 8, dtype: torch.dtype = torch.bfloat16):
         print(f'[{MODEL_NAME}]')
-        for label, source in MODEL_SOURCES.items():
-            print(f'  {label}: {source}')
 
         checkpoint_path, tokenizer_dir = _checkpoint_path(), _tokenizer_dir()
         self.device = device
@@ -260,4 +359,3 @@ class InternVideo2Stage2Scorer:
             feature = self.model.encode_text(tokens['input_ids'], tokens['attention_mask'])
             self._text_cache[text] = F.normalize(feature.float(), dim=-1)
         return self._text_cache[text]
-

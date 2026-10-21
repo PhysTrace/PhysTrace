@@ -289,7 +289,7 @@ def make_handler(browser: Browser):
                 attributes=sorted({pair['attribute'] for pair in browser.pairs}),
                 meta_cols=META_COLUMNS, filter_cols=FILTER_COLUMNS,
                 # A run that leaves its MLLM frames empty gets --mllm-frames, else the window at this rate.
-                model=str(browser.args.mllm_model), mllm_frames=browser.args.mllm_frames,
+                model=str(browser.args.mllm_model_dir), mllm_frames=browser.args.mllm_frames,
                 mllm_frames_per_second=FRAMES_PER_SECOND,
                 clip_frames=browser.args.clip_frames, default_prompts=browser.prompts,
                 clip_model=CLIP_MODELS[browser.args.clip_model].name,

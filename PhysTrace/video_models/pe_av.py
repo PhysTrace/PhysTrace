@@ -9,7 +9,6 @@ from contextlib import contextmanager
 import importlib.machinery
 import importlib.util
 import logging
-import os
 from pathlib import Path
 import sys
 import types
@@ -115,11 +114,11 @@ PEAudioVisual, PEAudioVisualTransform = _import_vendor_classes()
 
 def _checkpoint_dir() -> Path:
     """The local PE-AV checkpoint directory."""
-    path = Path(os.environ.get('PHYSTRACE_PE_AV_DIR') or CHECKPOINT_DIR)
+    path = CHECKPOINT_DIR
     for filename in ('config.json', WEIGHTS_FILE, 'tokenizer.json'):
         if not (path / filename).is_file():
             raise FileNotFoundError(f'PE-AV checkpoint file missing: {path / filename}; download '
-                                    f'{CHECKPOINT_REPO} there or set PHYSTRACE_PE_AV_DIR')
+                                    f'{CHECKPOINT_REPO} there')
     return path
 
 

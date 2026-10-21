@@ -64,11 +64,6 @@ Or clone the external repositories manually:
 # Alignment Scoring Models
 git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
 
-# Alignment Scoring Models (optional)
-git clone https://github.com/OpenGVLab/InternVideo.git AlignmentModels/InternVideo2
-```
-
-```bash
 # Diffusion models (only for Section 4: Evaluation for Video Generative Models)
 git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
 git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
@@ -84,10 +79,36 @@ hf auth login
 
 ```bash
 hf download facebook/pe-av-large --revision perception_models --local-dir AlignmentModels/weights/PE-AV-Large
+```
 
-# optional
-hf download OpenGVLab/InternVideo2-Stage2_6B --local-dir AlignmentModels/weights/InternVideo2-Stage2
-hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 --local-dir AlignmentModels/weights/InternVideo2-CLIP
+**Alignment Scoring Models (optional)**
+
+```bash
+# ---- internvideo2-stage2-6b ----
+# internvideo2-stage2
+hf download OpenGVLab/InternVideo2-Stage2_6B-224p-f4 internvideo2-s2_6b-224p-f4_with_audio_encoder.pt \
+    --local-dir AlignmentModels/weights/InternVideo2-Stage2
+
+# bert tokenizer
+hf download google-bert/bert-large-uncased vocab.txt tokenizer.json tokenizer_config.json config.json \
+    --local-dir AlignmentModels/weights/InternVideo2-Stage2/bert-large-uncased
+
+# ---- internvideo2-clip-6b ----
+# internvideo2-stage2 (same as above; skip if already downloaded)
+hf download OpenGVLab/InternVideo2-Stage2_6B-224p-f4 internvideo2-s2_6b-224p-f4_with_audio_encoder.pt \
+    --local-dir AlignmentModels/weights/InternVideo2-Stage2
+
+# InternVL-C 13B (25GB)
+hf download OpenGVLab/InternVL internvl_c_13b_224px.pth \
+    --local-dir AlignmentModels/weights/InternVideo2-CLIP
+
+# CLIP delta
+hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 6B_clip.pth \
+    --local-dir AlignmentModels/weights/InternVideo2-CLIP
+
+# LLaMA tokenizer
+hf download hfl/chinese-alpaca-lora-7b tokenizer.model tokenizer_config.json special_tokens_map.json \
+    --local-dir AlignmentModels/weights/InternVideo2-CLIP/tokenizer
 ```
 
 **MLLMs**
@@ -136,6 +157,8 @@ CUDA_VISIBLE_DEVICES=0 python3 demo/app.py \
 - `--intphys2-dir`: IntPhys2 root (uses `Main/Videos` and `Main/metadata.csv`; the CLIP cache `Main/videos-npz` is created beside them)
 - `--result-dir`: where `results.csv` / `trials.csv` are written
 - `--gt-csv`: violation GT drawn on the UI chart (defaults to `IntPhys2Timing/intphys2_gt.csv`)
+- `--mllm-backend`: `qwen3-vl-thinking` (default), `qwen3-vl-32b-thinking`, `cosmos-reason2`
+- `--clip-model`: `pe-av-large` (default), `internvideo2-stage2-6b`, `internvideo2-clip-6b`
 
 ### b) Inference
 
@@ -152,11 +175,8 @@ CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
 - `--window-seconds`, `--hop-seconds`: window length and hop between windows, in seconds
 - `--clip-frames`, `--mllm-frames`: frames fed to CLIP / the MLLM per window
 - `--categories`: limit the categories run per attribute, e.g. `solidity=BoxSoldity` (default: every category)
-
-Available backends:
-
-- `--clip-model`: `pe-av-large` (default), `internvideo2-stage2-6b`, `internvideo2-clip-6b`
 - `--mllm-backend`: `qwen3-vl-thinking` (default), `qwen3-vl-32b-thinking`, `cosmos-reason2`
+- `--clip-model`: `pe-av-large` (default), `internvideo2-stage2-6b`, `internvideo2-clip-6b`
 
 ### c) Scoring
 
