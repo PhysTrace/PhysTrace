@@ -81,6 +81,31 @@ hf auth login
 hf download facebook/pe-av-large --revision perception_models --local-dir AlignmentModels/weights/PE-AV-Large
 ```
 
+**MLLMs**
+
+```bash
+hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
+
+# optional
+hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
+hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
+```
+
+**Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
+
+```bash
+hf download Wan-AI/Wan2.1-T2V-1.3B --revision 37ec512624d61f7aa208f7ea8140a131f93afc9a \
+    --local-dir DiffusionModels/weights/wan/Wan2.1-T2V-1.3B
+
+hf download nvidia/Cosmos-Predict2-2B-Video2World --revision f50c09f5d8ab133a90cac3f4886a6471e9ba3f18 \
+    --local-dir DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World \
+    --include config.json model_index.json model-480p-16fps.pt "scheduler/*" "text_encoder/*" "tokenizer/*" "vae/*"
+
+# Cosmos-Predict2 loads T5 with from_pretrained(<dir>), so the tokenizer must sit beside the text encoder weights
+M=DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World
+cp $M/tokenizer/{special_tokens_map.json,spiece.model,tokenizer.json,tokenizer_config.json} $M/text_encoder/
+```
+
 **Alignment Scoring Models (optional)**
 
 ```bash
@@ -109,31 +134,6 @@ hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 6B_clip.pth \
 # LLaMA tokenizer
 hf download hfl/chinese-alpaca-lora-7b tokenizer.model tokenizer_config.json special_tokens_map.json \
     --local-dir AlignmentModels/weights/InternVideo2-CLIP/tokenizer
-```
-
-**MLLMs**
-
-```bash
-hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
-
-# optional
-hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
-hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
-```
-
-**Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
-
-```bash
-hf download Wan-AI/Wan2.1-T2V-1.3B --revision 37ec512624d61f7aa208f7ea8140a131f93afc9a \
-    --local-dir DiffusionModels/weights/wan/Wan2.1-T2V-1.3B
-
-hf download nvidia/Cosmos-Predict2-2B-Video2World --revision f50c09f5d8ab133a90cac3f4886a6471e9ba3f18 \
-    --local-dir DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World \
-    --include config.json model_index.json model-480p-16fps.pt "scheduler/*" "text_encoder/*" "tokenizer/*" "vae/*"
-
-# Cosmos-Predict2 loads T5 with from_pretrained(<dir>), so the tokenizer must sit beside the text encoder weights
-M=DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World
-cp $M/tokenizer/{special_tokens_map.json,spiece.model,tokenizer.json,tokenizer_config.json} $M/text_encoder/
 ```
 
 ### d) Data Download: IntPhys2 (for IntPhys2-Timing)
