@@ -205,8 +205,10 @@ Each IntPhys2 video is inverted (clean → noise) by a video generative model, a
 CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/prob_wan.py \
     -i /Path/To/IntPhys2 \
     -o results/wan \
-    --sigmas 0.5,0.6,0.7,0.8,0.9,0.95,0.99 \
-    --stride 8
+    --sigmas 0.5,0.8 \
+    --stride 1 \
+    --chunked \
+    --overlap 0
 ```
 
 **Cosmos-Predict2-2B**
@@ -215,15 +217,18 @@ CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/prob_wan.py \
 CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/prob_cosmos.py \
     -i /Path/To/IntPhys2 \
     -o results/cosmos \
-    --sigmas 0.5,0.6,0.7,0.8,0.9,0.95,0.99 \
-    --frames 93
+    --sigmas 0.5,0.8 \
+    --stride 1 \
+    --chunked \
+    --overlap 0
 ```
 
 - `-i`: IntPhys2 root (same as `--intphys2-dir` above), a folder of `.mp4` files, or a single video
 - `-o`: output directory; one `sigma_<value>/Main/Videos` folder (with `metadata.csv`) is written per sigma, plus `sigma_0.00_INPUT` for the input frames
 - `--sigmas`: comma-separated sigmas (= flow time) at which the x0 estimate is decoded
-- `--stride` (Wan): use every N-th source frame (`8` = 7.5 fps from 60 fps)
-- `--frames` (Cosmos): keep exactly N frames spread evenly over the whole clip (`93` = one model window, no padding)
+- `--stride`: use every N-th source frame (`1` = all frames at the original 60 fps, `8` = 7.5 fps)
+- `--chunked`: split the video into fixed-length chunks (Wan: 81 frames, Cosmos: 93 frames) and invert each chunk independently, then cross-fade the chunks back together. Without this flag, the whole video is inverted jointly (MultiDiffusion over latent windows, overlap set by `--latent_overlap`)
+- `--overlap` (with `--chunked`): number of pixel frames shared by consecutive chunks, linearly cross-faded in the shared region (default `10`; `0` = chunks are placed back-to-back with no blending)
 - `--gt-csv`: generate only the pairs listed in this GT CSV (defaults to `IntPhys2Timing/intphys2_gt.csv`)
 
 ### b) Inference
