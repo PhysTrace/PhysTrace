@@ -1,12 +1,12 @@
 # PhysTrace: Interpretable Temporal Evaluation of Physical Consistency in Video Generative Models
 
 <p align="center">
-  <a href="https://arxiv.org/abs/XXXX.XXXXX">
+  <a href="https://arxiv.org/abs/2610.31429">
     <img src="https://img.shields.io/badge/Paper-arXiv-b31b1b" alt="arXiv">
   </a>
 </p>
 
-Official codebase for the paper **"PhysTrace: Interpretable Temporal Evaluation of Physical Consistency in Video Generative Models"**.
+Official codebase for the paper **"[PhysTrace: Interpretable Temporal Evaluation of Physical Consistency in Video Generative Models](https://arxiv.org/abs/2610.31429)"**.
 
 <div>
 <!-- TODO: replace with the teaser figure -->
@@ -284,8 +284,8 @@ If you find this repository useful, please cite the paper.
 @article{yoo2026phystrace,
     title={{PhysTrace}: Interpretable Temporal Evaluation of Physical Consistency in Video Generative Models},
     author={Yoo, Taekoan and Jung, Wonkyung and Kim, Kyunghun and Kong, Kyeongbo},
-    journal={arXiv preprint arXiv:XXXX.XXXXX},
+    journal={arXiv preprint arXiv:2610.31429},
     year={2026},
-    url={TODO}
+    url={https://arxiv.org/abs/2610.31429}
 }
 ```
