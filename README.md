@@ -17,7 +17,7 @@ Official codebase for the paper **"PhysTrace: Interpretable Temporal Evaluation 
 
 This repository provides the evaluation code for **PhysTrace**, which localizes *when* a video breaks physical consistency instead of returning a single video-level score.
 
-- **Sliding-window scoring**: each video is split into overlapping windows, scored by a video-text alignment model (PE-AV-Large by default) and a reasoning MLLM (Qwen3-VL-8B-Thinking by default).
+- **Sliding-window scoring**: each video is split into overlapping windows, scored by a video-text alignment model (PE-AV-Large by default) and a reasoning MLLM (Qwen3.8-27B by default).
 - **IntPhys2-Timing**: temporal violation annotations (onset / end) on top of IntPhys2, covering the four physical attributes `solidity`, `permanence`, `immutability`, and `continuity`.
 
 ## 1. Repository Structure
@@ -84,7 +84,7 @@ hf download facebook/pe-av-large --revision perception_models --local-dir Alignm
 **MLLMs**
 
 ```bash
-hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
+hf download Qwen/Qwen3.8-27B-FP8 --local-dir AlignmentModels/weights/Qwen3.8-27B-fp8
 ```
 
 **Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
@@ -131,6 +131,9 @@ hf download OpenGVLab/InternVideo2-CLIP-6B-224p-f8 6B_clip.pth \
 hf download hfl/chinese-alpaca-lora-7b tokenizer.model tokenizer_config.json special_tokens_map.json \
     --local-dir AlignmentModels/weights/InternVideo2-CLIP/tokenizer
 
+# ---- MLLM : Qwen3-VL-8B-Thinking ----
+hf download Qwen/Qwen3-VL-8B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-8B-Thinking
+
 # ---- MLLM : Qwen3-VL-32B-Thinking ----
 hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3-VL-32B-Thinking
 
@@ -159,7 +162,7 @@ CUDA_VISIBLE_DEVICES=0 python3 demo/app.py \
 - `--intphys2-dir`: IntPhys2 root (uses `Main/Videos` and `Main/metadata.csv`; the CLIP cache `Main/videos-npz` is created beside them)
 - `--result-dir`: where `results.csv` / `trials.csv` are written
 - `--gt-csv`: violation GT drawn on the UI chart (defaults to `IntPhys2Timing/intphys2_gt.csv`)
-- `--mllm-backend`: `qwen3-vl-thinking` (default), `qwen3-vl-32b-thinking`, `cosmos-reason2`
+- `--mllm-backend`: `qwen3.8-27b` (default), `qwen3-vl-thinking`, `qwen3-vl-32b-thinking`, `cosmos-reason2`
 - `--clip-model`: `pe-av-large` (default), `internvideo2-stage2-6b`, `internvideo2-clip-6b`
 
 ### b) Inference
@@ -177,7 +180,7 @@ CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
 - `--window-seconds`, `--hop-seconds`: window length and hop between windows, in seconds
 - `--clip-frames`, `--mllm-frames`: frames fed to CLIP / the MLLM per window
 - `--categories`: limit the categories run per attribute, e.g. `solidity=BoxSoldity` (default: every category)
-- `--mllm-backend`: `qwen3-vl-thinking` (default), `qwen3-vl-32b-thinking`, `cosmos-reason2`
+- `--mllm-backend`: `qwen3.8-27b` (default), `qwen3-vl-thinking`, `qwen3-vl-32b-thinking`, `cosmos-reason2`
 - `--clip-model`: `pe-av-large` (default), `internvideo2-stage2-6b`, `internvideo2-clip-6b`
 
 ### c) Scoring

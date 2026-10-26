@@ -41,7 +41,9 @@ from PhysTrace.video_models.mllm import (  # noqa: E402
     DEFAULT_SEED,
     DEFAULT_THINKING_BUDGET,
     VideoPredictor,
+    make_predictor,
 )
+from PhysTrace.video_models.mllm_openrouter import OpenRouterAuthError  # noqa: E402
 from PhysTrace.video_models.mllm_prompts import ATTRIBUTES, PROMPT_SET_DIR, PromptConfig, load_prompt_set  # noqa: E402
 from PhysTrace.video_pipeline import analyze_video  # noqa: E402
 from score.batching import BatchLLM, Locked, Progress  # noqa: E402
@@ -61,7 +63,7 @@ EXIT_FATAL = 3        # the GPU context or the engine is gone; the remaining pai
 EXIT_TERMINATED = 143
 
 # Once one of these is raised the process cannot do anything useful on the GPU again.
-FATAL_ERRORS = (torch.AcceleratorError, torch.OutOfMemoryError, EngineDeadError)
+FATAL_ERRORS = (torch.AcceleratorError, torch.OutOfMemoryError, EngineDeadError, OpenRouterAuthError)
 _FATAL_MESSAGES = ('CUDA error', 'CUDA out of memory', 'NCCL error', 'EngineCore')
 
 
@@ -134,7 +136,8 @@ def _add_analysis_arguments(parser: argparse.ArgumentParser) -> None:
     walk.add_argument('--window-seconds', type=float, default=DEFAULT_WINDOW_SECONDS)
     walk.add_argument('--hop-seconds', type=float, default=DEFAULT_HOP_SECONDS, help='0 < hop <= window')
 
-    mllm = parser.add_argument_group('MLLM (vLLM; pick its GPU with CUDA_VISIBLE_DEVICES)')
+    mllm = parser.add_argument_group('MLLM (vLLM, pick its GPU with CUDA_VISIBLE_DEVICES; or OpenRouter for '
+                                     'gemini-3.8-flash-openrouter, qwen3.8-27b-openrouter, gpt-6-sol-openrouter)')
     mllm.add_argument('--mllm-backend', choices=sorted(BACKENDS), default=DEFAULT_BACKEND)
     mllm.add_argument('--mllm-model-dir', type=Path, help="model directory, if it is not the backend's own")
     mllm.add_argument('--mllm-frames', type=int, default=DEFAULT_MLLM_FRAMES,
@@ -292,11 +295,12 @@ def load_models(args: argparse.Namespace) -> tuple[VideoPredictor, ClipScorer]:
                         sample_frames=args.clip_frames != ALL_FRAMES)
     print(f'[load] {args.clip_model}: {time.perf_counter() - started:.2f}s', flush=True)
     started = time.perf_counter()
-    predictor = VideoPredictor(
+    predictor = make_predictor(
         args.backend, str(args.mllm_model_dir), window_seconds=args.window_seconds, num_frames=args.mllm_frames,
         max_new_tokens=args.max_new_tokens, seed=args.seed, temperature=args.temperature,
         gpu_fraction=args.gpu_fraction, thinking_budget=args.thinking_budget, max_model_len=args.max_model_len)
-    print(f'[load] mllm (vllm): {time.perf_counter() - started:.2f}s', flush=True)
+    print(f"[load] mllm ({'openrouter' if args.backend.remote_id else 'vllm'}): "
+          f'{time.perf_counter() - started:.2f}s', flush=True)
     return predictor, scorer
 
 
@@ -440,8 +444,11 @@ def run_shard(args: argparse.Namespace) -> int:
     batcher = None
     if args.threads > 1:
         # One thread keeps the engine and the scorer to itself; several share them through these wrappers.
-        batcher = BatchLLM(predictor.llm)
-        predictor.llm, scorer = batcher, Locked(scorer)
+        # A remote backend has no engine: its threads' HTTP calls already run side by side.
+        if not args.backend.remote_id:
+            batcher = BatchLLM(predictor.llm)
+            predictor.llm = batcher
+        scorer = Locked(scorer)
 
     def in_flight() -> int:
         return len(batcher.pending) if batcher else 0

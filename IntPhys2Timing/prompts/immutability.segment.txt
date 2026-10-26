@@ -8,10 +8,4 @@ For "state": if the object is visible, name it with the color and shape the fram
 
 For "prediction": follow the Case A / Case B rules from the system prompt. Before you choose Case B, name the frames where the object is clearly visible and how its look differs from the history. From the earlier clips alone, take the object's color, shape and size. If the object is not in view in this clip, or it is in view looking as the history says, copy "state" (Case A). If it is clearly visible and its color, shape, size or kind differs from the history object it continues (not merely because of light, shadow or angle), every prediction is a 2-to-5-word sentence naming only the history object by its history color and shape, with no setup word (Case B).
 
-Answer the question using the following format:
-
-<think>
-Your reasoning.
-</think>
-
-Write your final answer immediately after the </think> tag.
+Reason through the clip first. When you are done, write only the JSON object, with no text, tags or code fences before or after it.

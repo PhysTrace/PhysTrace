@@ -198,10 +198,10 @@ def analyze_video(video, predictor: VideoPredictor, scorer, *,  # noqa: PLR0913
         models=dict(mllm_backend=predictor.backend.name, mllm=predictor.model_path,
                     mllm_frames=mllm_frames, max_new_tokens=max_new_tokens,
                     thinking_budget=thinking_budget, max_model_len=predictor.max_model_len,
-                    temperature=predictor.temperature, seed=predictor.sampling.seed,
+                    temperature=predictor.temperature, seed=predictor.seed,
                     clip=scorer.identity()),
         anomaly_rule=dict(lowest_windows=prompts.lowest_windows),
         has_anomaly=bool(intervals), anomaly_intervals=intervals, windows=rows,
         trusted_history=history.transcript(),
         # The system turn every window's `model_inputs` follows, stored once per video.
-        model_input_system=predictor.render_system(system_prompt(prompts)))
+        model_input_system=predictor.render_system_turn(system_prompt(prompts)))

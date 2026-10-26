@@ -8,10 +8,4 @@ For "state": name the visible solid objects by color or material and shape, and 
 
 For "prediction": follow the Case A / Case B rules from the system prompt. From the earlier clips alone, decide where solidity puts each object in this clip and whether that place is in view. If the arrangement is one solid objects could have, or the place is not in view, copy "state" (Case A). If the place is plainly in view and an object is buried in another, on a side or below it could only reach by passing it, in another object's place, gone from the place where it must be, or hanging with nothing under it, every prediction is a 4-to-8-word sentence naming only the history object and the one other object, with the place solidity expects (Case B), and "trusted" is false.
 
-Answer the question using the following format:
-
-<think>
-Your reasoning.
-</think>
-
-Write your final answer immediately after the </think> tag.
+Reason through the clip first. When you are done, write only the JSON object, with no text, tags or code fences before or after it.

@@ -374,14 +374,14 @@ function chart(result,range,gt) {
 function showWindowFrames(side,result,row) {
   const pair=PAIRS.find(p=>p.group===SEL), name=pair?.[side+'_name'];
   const sampled=row.sampled_frames || {};
-  const renderStrip=(kind,label)=>{
+  const renderStrip=kind=>{
     const indices=sampled[kind];
-    if(!indices?.length)return `<h3>${label}</h3><p class="meta">This record has no input-frame information.</p>`;
-    return `<h3>${label} · ${indices.length} frames</h3><div class="model-filmstrip">${indices.map(index=>`<button type="button" class="model-frame" data-frame="${index}" title="Go to original frame ${index}"><img loading="lazy" src="/api/frame?name=${encodeURIComponent(name)}&i=${index}" alt="${label} frame ${index}"><span>f${index} · ${(index/result.fps).toFixed(2)}s</span></button>`).join('')}</div>`;
+    if(!indices?.length)return `<p class="meta">This record has no input-frame information.</p>`;
+    return `<h3>${indices.length} frames</h3><div class="model-filmstrip">${indices.map(index=>`<button type="button" class="model-frame" data-frame="${index}" title="Go to original frame ${index}"><img loading="lazy" src="/api/frame?name=${encodeURIComponent(name)}&i=${index}" alt="frame ${index}"><span>f${index} · ${(index/result.fps).toFixed(2)}s</span></button>`).join('')}</div>`;
   };
   $(`model-frames-${side}`).innerHTML=`<h3>Selected window ${row.start_sec.toFixed(2)}–${row.end_sec.toFixed(2)}s · CLIP input frames</h3>
     <p class="meta">${row.sampled_frames_reconstructed?'Frames reconstructed from the stored settings and the sampler.':'Original frame indices used in the run.'} Shown before resize and normalization. Each CLIP score is for the whole window, not per frame.</p>
-    ${renderStrip('clip','InternVideo2-CLIP')}
+    ${renderStrip('clip')}
     <p class="meta">${row.history_source_segment==null?'No trusted window history: no earlier window was used for the prediction.':`This window's prediction used the state history up to trusted window ${row.history_source_segment+1}.`}</p>`;
   $(`model-frames-${side}`).querySelectorAll('[data-frame]').forEach(button=>button.onclick=()=>scrub(side,Number(button.dataset.frame)));
 }

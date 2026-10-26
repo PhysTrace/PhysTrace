@@ -35,6 +35,8 @@ PROMPT_TOKENS_RESERVED = 8192
 # (Qwen3-VL defaults to 2, Cosmos-Reason2 is documented at 4) and derive the count from the
 # clip's duration. 4 matches Cosmos-Reason2's documented rate.
 FRAMES_PER_SECOND = 4
+CHATML_USER_TURN = '<|im_start|>user'
+ANSWER_OPENING = re.compile(r'\{\s*"state"')
 
 
 def frames_for(window_seconds: float) -> int:
@@ -58,6 +60,11 @@ class Backend:
     """One model family: where it lives, how it answers, and the budget it was measured with.
 
     `max_model_len` covers prompt and output; `vllm_budget_gib` becomes vLLM's share of the whole device.
+    A backend with a `remote_id` is served by OpenRouter instead: `max_new_tokens` is then the endpoint's
+    output cap, `media_resolution` and the provider filter (`quantizations`, `ignore`) go into the request,
+    and the vLLM fields are unused.
+    `reasoning_effort` goes to the chat template of a checkpoint that takes one (Qwen3.8: xhigh, medium, low).
+    `system_needs_user` marks a chat template that refuses to render a system turn without a user turn after it.
     """
 
     name: str
@@ -66,10 +73,16 @@ class Backend:
     max_new_tokens: int
     vllm_budget_gib: float
     max_model_len: int
+    remote_id: str | None = None
+    media_resolution: str | None = None
+    quantizations: tuple[str, ...] = ()
+    ignore: tuple[str, ...] = ()        # OpenRouter provider slugs never routed to
+    reasoning_effort: str | None = None
+    system_needs_user: bool = False
 
     def path(self, checkpoint_root) -> str:
-        """Where this backend's checkpoint sits under `checkpoint_root`."""
-        return str(Path(checkpoint_root) / self.model_dir)
+        """Where this backend's checkpoint sits under `checkpoint_root`; a remote backend's model id."""
+        return self.remote_id or str(Path(checkpoint_root) / self.model_dir)
 
 
 BACKENDS = {backend.name: backend for backend in (
@@ -82,8 +95,18 @@ BACKENDS = {backend.name: backend for backend in (
     # The Thinking checkpoint's chat template opens <think> itself, and its reasoning needs Cosmos' token budget.
     Backend('qwen3-vl-32b-thinking', 'Qwen3-VL-32B-Thinking', reasoning=True, max_new_tokens=4096,
             vllm_budget_gib=72.0, max_model_len=16384),
+    # 27B fp8 (e4m3): 29GiB of weights; the budget is a first guess, the bf16 checkpoint's 74GiB peak less 22GiB.
+    Backend('qwen3.8-27b', 'Qwen3.8-27B-fp8', reasoning=True, max_new_tokens=4096, vllm_budget_gib=56.0,
+            max_model_len=40960 + PROMPT_TOKENS_RESERVED, system_needs_user=True),
+    # OpenRouter (mllm_openrouter.py). Gemini's frames at MEDIUM resolution cost ~530 tokens each and read
+    Backend('gemini-3.8-flash-openrouter', '', reasoning=True, max_new_tokens=65536, vllm_budget_gib=0,
+            max_model_len=1048576, remote_id='google/gemini-3.8-flash', media_resolution='MEDIA_RESOLUTION_MEDIUM'),
+    Backend('qwen3.8-27b-openrouter', '', reasoning=True, max_new_tokens=65536, vllm_budget_gib=0,
+            max_model_len=262144, remote_id='qwen/qwen3.8-27b', quantizations=('fp8'), ignore=('deepinfra',)),
+    Backend('gpt-6-sol-openrouter', '', reasoning=True, max_new_tokens=128000, vllm_budget_gib=0,
+            max_model_len=1050000, remote_id='openai/gpt-6-sol'),
 )}
-DEFAULT_BACKEND = 'qwen3-vl-thinking'
+DEFAULT_BACKEND = 'qwen3.8-27b'
 
 
 @dataclass(frozen=True)
@@ -122,7 +145,8 @@ def _unwrap(raw: str) -> str:
     """
     text = raw.strip()
     if '</think>' in text:
-        text = text.split('</think>', 1)[1].strip()
+        # The last tag: the prompt names </think>, and the model quotes it while reasoning.
+        text = text.rsplit('</think>', 1)[1].strip()
     elif text.startswith('<think>'):
         raise ValueError('Reasoning was truncated before the answer; raise --max-new-tokens')
     if text.startswith('<answer>'):
@@ -133,9 +157,21 @@ def _unwrap(raw: str) -> str:
     return text
 
 
+def _load_object(text: str):
+    """The answer's JSON: the whole text, else the last object in it that opens with "state"."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Some answers wrap the object in tags of their own (<tool_call>) or put a write-up before it.
+        openings = list(ANSWER_OPENING.finditer(text))
+        if not openings:
+            raise
+        return json.JSONDecoder().raw_decode(text, openings[-1].start())[0]
+
+
 def parse_answer(raw: str, num_prompts: int) -> Prediction:
     """Read one answer, or raise so the caller can ask again."""
-    answer = json.loads(_unwrap(raw))
+    answer = _load_object(_unwrap(raw))
     if not isinstance(answer, dict):
         raise ValueError('Expected a JSON object')
     missing = [field for field in Prediction.FIELDS if field not in answer]
@@ -195,9 +231,10 @@ class VideoPredictor:
         self.max_new_tokens, self.thinking_budget = self.limits(Ask(1, max_new_tokens or backend.max_new_tokens,
                                                                     thinking_budget or 0))
         self.processor = AutoProcessor.from_pretrained(model_path)
+        self.template_kwargs = {'reasoning_effort': backend.reasoning_effort} if backend.reasoning_effort else {}
         # Thinking checkpoints open <think> in the generation prompt; Cosmos-Reason2 writes both tags itself.
-        self.opens_think = self.processor.apply_chat_template(
-            [{'role': 'user', 'content': 'x'}], tokenize=False, add_generation_prompt=True).rstrip().endswith('<think>')
+        self.opens_think = self.render_chat([{'role': 'user', 'content': 'x'}],
+                                            add_generation_prompt=True).rstrip().endswith('<think>')
         if gpu_fraction is None:
             gpu_fraction = self._fit_to_device(backend.vllm_budget_gib)
         try:
@@ -221,7 +258,7 @@ class VideoPredictor:
         # The seed is the one thing added on top; see DEFAULT_SEED.
         self.sampling = self.llm.get_default_sampling_params()
         self.sampling.max_tokens = self.max_new_tokens
-        self.sampling.seed = seed
+        self.sampling.seed = self.seed = seed
         self.sampling.thinking_token_budget = self.thinking_budget
         if temperature is not None:
             # Only when a run asks for it: `--temperature 0` makes decoding greedy, which is
@@ -289,7 +326,7 @@ class VideoPredictor:
 
         Returns the parsed answer, every attempt's raw text (where the reasoning survives) and its rendered prompt.
         """
-        system_turn = self.render_system(system)
+        system_turn = self.render_system_turn(system)
         indices = self.sample_indices(len(frames), ask.num_frames)
         rgb = np.stack([np.ascontiguousarray(frames[index][:, :, ::-1]) for index in indices])
         sampling = self.sampling.clone()
@@ -303,7 +340,7 @@ class VideoPredictor:
                 # The chat template joins the parts with nothing between them.
                 content.insert(0, {'type': 'text', 'text': history + '\n'})
             messages = [{'role': 'system', 'content': system}, {'role': 'user', 'content': content}]
-            prompt = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            prompt = self.render_chat(messages, add_generation_prompt=True)
             if not prompt.startswith(system_turn):
                 raise ValueError(f'The chat template of {self.model_path} does not open the prompt with the system '
                                  f'turn alone, so the stored inputs cannot leave it out')
@@ -319,10 +356,21 @@ class VideoPredictor:
         raise ValueError(f'MLLM returned invalid output after {ATTEMPTS} attempts: {error}\n'
                          f'Raw output: {raws[-1]}')
 
-    def render_system(self, system: str) -> str:
+    def render_chat(self, messages: list[dict], add_generation_prompt: bool = False) -> str:
+        """The messages as the chat template renders them, with the backend's template options."""
+        return self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt,
+                                                  **self.template_kwargs)
+
+    def render_system_turn(self, system: str) -> str:
         """The system turn as the chat template opens every prompt with it."""
-        return self.processor.apply_chat_template([{'role': 'system', 'content': system}], tokenize=False,
-                                                  add_generation_prompt=False)
+        if not self.backend.system_needs_user:
+            return self.render_chat([{'role': 'system', 'content': system}])
+        # The template refuses a system turn alone, so render a user turn after it and cut there.
+        rendered = self.render_chat([{'role': 'system', 'content': system}, {'role': 'user', 'content': 'x'}])
+        if CHATML_USER_TURN not in rendered:
+            raise ValueError(f'The chat template of {self.model_path} does not open the user turn with '
+                             f'{CHATML_USER_TURN!r}, so the system turn cannot be cut out of the prompt')
+        return rendered[:rendered.index(CHATML_USER_TURN)]
 
     def _generate(self, prompt: str, rgb: np.ndarray, timing: tuple[float, list[int], int], sampling) -> str:
         """One generation of a rendered prompt over this window's frames.
@@ -340,3 +388,15 @@ class VideoPredictor:
              'mm_processor_kwargs': {'do_sample_frames': False}},
             sampling, use_tqdm=False)[0]
         return output.outputs[0].text
+
+
+def make_predictor(backend: Backend, model_path: str, **options):
+    """The predictor that serves `backend`: a local vLLM engine, or OpenRouter for a remote one.
+
+    `options` are VideoPredictor's keyword arguments; the remote predictor takes the same ones.
+    """
+    if backend.remote_id:
+        # Imported here: mllm_openrouter imports this module.
+        from PhysTrace.video_models.mllm_openrouter import OpenRouterPredictor
+        return OpenRouterPredictor(backend, model_path, **options)
+    return VideoPredictor(backend, model_path, **options)

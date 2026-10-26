@@ -31,7 +31,7 @@ from PhysTrace.video_models.mllm import (  # noqa: E402
     DEFAULT_BACKEND,
     DEFAULT_SEED,
     DEFAULT_THINKING_BUDGET,
-    VideoPredictor,
+    make_predictor,
 )
 from PhysTrace.video_models.mllm_prompts import ATTRIBUTES, PROMPT_SET_DIR, PromptConfig, load_prompt_set  # noqa: E402
 from PhysTrace.video_pipeline import analyze_video  # noqa: E402
@@ -73,7 +73,8 @@ class Demo:
                                       sample_frames=self.clip_frames != ALL_FRAMES)
         if self.predictor is None:
             self.predictor = self._timed(
-                'mllm (vllm)', VideoPredictor, self.args.backend, str(self.args.mllm_model_dir),
+                'mllm (openrouter)' if self.args.backend.remote_id else 'mllm (vllm)', make_predictor,
+                self.args.backend, str(self.args.mllm_model_dir),
                 window_seconds=self.args.window_seconds, num_frames=self.args.mllm_frames,
                 max_new_tokens=self.args.max_new_tokens, seed=self.args.seed,
                 temperature=self.args.temperature, gpu_fraction=self.args.gpu_fraction,
@@ -159,7 +160,8 @@ def _add_demo_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
     """Which models to load and how much they may generate."""
-    group = parser.add_argument_group('MLLM (vLLM; pick its GPU with CUDA_VISIBLE_DEVICES)')
+    group = parser.add_argument_group('MLLM (vLLM, pick its GPU with CUDA_VISIBLE_DEVICES; or OpenRouter for '
+                                      'gemini-3.8-flash-openrouter, qwen3.8-27b-openrouter, gpt-6-sol-openrouter)')
     group.add_argument('--mllm-backend', choices=sorted(BACKENDS), default=DEFAULT_BACKEND)
     group.add_argument('--mllm-model-dir', type=Path,
                        help="model directory, if it is not the backend's own under AlignmentModels/weights/")
@@ -245,7 +247,8 @@ def main() -> None:
     # A plain `kill` would skip atexit and orphan vLLM's engine process on the GPU.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     args = parse_args()
-    print(f'[MLLM] loading {args.mllm_model_dir} (vllm) and {CLIP_MODELS[args.clip_model].name}…', flush=True)
+    engine = 'openrouter' if args.backend.remote_id else 'vllm'
+    print(f'[MLLM] loading {args.mllm_model_dir} ({engine}) and {CLIP_MODELS[args.clip_model].name}…', flush=True)
     demo = Demo(args)
     demo.load_models()
     print('[MLLM] models ready', flush=True)

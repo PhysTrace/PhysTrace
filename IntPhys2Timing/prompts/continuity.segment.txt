@@ -8,10 +8,4 @@ For "state": name the visible movable objects by color and shape, each with its 
 
 For "prediction": follow the Case A / Case B rules from the system prompt. Case A is the default: copy "state" unless the contradiction is plain in at least two frames. From the earlier clips alone, find the last clip k that showed the object, where it was and where it was heading, decide where it must be in this clip and whether that place is in view, then compare with this clip, then write. If the object must be in view and is not visible anywhere, or is visible with another color or shape, or at another place, every prediction is a 2-to-5-word sentence naming only the expected history object by color and shape, with no setup word (Case B); "trusted" is then false.
 
-Answer the question using the following format:
-
-<think>
-Your reasoning.
-</think>
-
-Write your final answer immediately after the </think> tag.
+Reason through the clip first. When you are done, write only the JSON object, with no text, tags or code fences before or after it.
