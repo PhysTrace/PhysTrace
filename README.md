@@ -10,7 +10,7 @@ Official codebase for the paper **"[PhysTrace: Interpretable Temporal Evaluation
 
 <div>
 <!-- TODO: replace with the teaser figure -->
-<img width="100%" alt="PhysTrace Overview" src="https://github.com/user-attachments/assets/0f78430b-34e6-497a-bcdf-a1ed5f450023" />
+<img width="100%" alt="PhysTrace Overview" src="https://github.com/user-attachments/assets/b5a56a9b-83f4-45c2-b4e5-917a2ba8d0e7" />
 </div>
 
 ## Overview
@@ -64,9 +64,13 @@ Or clone the external repositories manually:
 # Alignment Scoring Models
 git clone https://github.com/facebookresearch/perception_models.git AlignmentModels/PE_AV_large
 
-# Diffusion models (only for Section 4: Evaluation for Video Generative Models)
+# Diffusion/flow-based video generative models (only for Section 4: Evaluation for Video Generative Models)
 git clone https://github.com/Wan-Video/Wan2.1.git DiffusionModels/Wan2.1
 git clone https://github.com/nvidia-cosmos/cosmos-predict2.git DiffusionModels/cosmos-predict2
+
+# (Optional) Diffusion/flow-based video generative models
+git clone https://github.com/meituan-longcat/LongCat-Video.git DiffusionModels/LongCat-Video
+git clone https://github.com/AILab-CVC/VideoCrafter.git DiffusionModels/VideoCrafter
 ```
 
 ### c) Weight Download
@@ -87,13 +91,12 @@ hf download facebook/pe-av-large --revision perception_models --local-dir Alignm
 hf download Qwen/Qwen3.8-27B-FP8 --local-dir AlignmentModels/weights/Qwen3.8-27B-fp8
 ```
 
-**Diffusion models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
+**Diffusion/flow-based video generative models** (only for [4. Evaluation for Video Generative Models](#4-evaluation-for-video-generative-models))
 
 ```bash
-hf download Wan-AI/Wan2.1-T2V-1.3B --revision 37ec512624d61f7aa208f7ea8140a131f93afc9a \
-    --local-dir DiffusionModels/weights/wan/Wan2.1-T2V-1.3B
+hf download Wan-AI/Wan2.1-T2V-1.3B --local-dir DiffusionModels/weights/Wan2.1-T2V-1.3B
 
-hf download nvidia/Cosmos-Predict2-2B-Video2World --revision f50c09f5d8ab133a90cac3f4886a6471e9ba3f18 \
+hf download nvidia/Cosmos-Predict2-2B-Video2World \
     --local-dir DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World \
     --include config.json model_index.json model-480p-16fps.pt "scheduler/*" "text_encoder/*" "tokenizer/*" "vae/*"
 
@@ -139,6 +142,18 @@ hf download Qwen/Qwen3-VL-32B-Thinking --local-dir AlignmentModels/weights/Qwen3
 
 # ---- MLLM : Cosmos-Reason2-8B ----
 hf download nvidia/Cosmos-Reason2-8B --local-dir AlignmentModels/weights/Cosmos-Reason2-8B
+
+# ---- Diffusion/flow-based model : CogVideoX-5B ----
+hf download zai-org/CogVideoX-5b --local-dir DiffusionModels/weights/CogVideoX-5b
+
+# ---- Diffusion/flow-based model : LongCat-Video-13.6B ----
+hf download meituan-longcat/LongCat-Video --exclude "lora/*" --local-dir DiffusionModels/weights/LongCat-Video
+
+# ---- Diffusion/flow-based model : ModelScope-T2V-1.7B ----
+hf download ali-vilab/text-to-video-ms-1.7b --exclude "*.bin" --local-dir DiffusionModels/weights/text-to-video-ms-1.7b
+
+# ---- Diffusion/flow-based model : VideoCrafter2 ----
+hf download VideoCrafter/VideoCrafter2 model.ckpt --local-dir DiffusionModels/weights/VideoCrafter2
 ```
 
 ### d) Data Download: IntPhys2 (for IntPhys2-Timing)
@@ -205,33 +220,33 @@ Each IntPhys2 video is inverted (clean → noise) by a video generative model, a
 **Wan2.1-T2V-1.3B**
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/prob_wan.py \
+CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_wan.py \
     -i /Path/To/IntPhys2 \
     -o results/wan \
-    --sigmas 0.5,0.8 \
-    --stride 1 \
-    --chunked \
-    --overlap 0
+    --sigmas 0.5,0.8,1.0 \
+    --lambdas 0.5,1.0 \
+    --seeds 2 \
+    --prefix I
 ```
 
 **Cosmos-Predict2-2B**
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/prob_cosmos.py \
+CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_cosmos20.py \
     -i /Path/To/IntPhys2 \
     -o results/cosmos \
-    --sigmas 0.5,0.8 \
-    --stride 1 \
-    --chunked \
-    --overlap 0
+    --sigmas 0.5,0.8,1.0 \
+    --lambdas 0.5,1.0 \
+    --seeds 2 \
+    --prefix I
 ```
 
-- `-i`: IntPhys2 root (same as `--intphys2-dir` above), a folder of `.mp4` files, or a single video
-- `-o`: output directory; one `sigma_<value>/Main/Videos` folder (with `metadata.csv`) is written per sigma, plus `sigma_0.00_INPUT` for the input frames
-- `--sigmas`: comma-separated sigmas (= flow time) at which the x0 estimate is decoded
-- `--stride`: use every N-th source frame (`1` = all frames at the original 60 fps, `8` = 7.5 fps)
-- `--chunked`: split the video into fixed-length chunks (Wan: 81 frames, Cosmos: 93 frames) and invert each chunk independently, then cross-fade the chunks back together. Without this flag, the whole video is inverted jointly (MultiDiffusion over latent windows, overlap set by `--latent_overlap`)
-- `--overlap` (with `--chunked`): number of pixel frames shared by consecutive chunks, linearly cross-faded in the shared region (default `10`; `0` = chunks are placed back-to-back with no blending)
+- `-i`: IntPhys2 root (same as `--intphys2-dir` above) or a folder of `.mp4` files
+- `-o`: output directory; each pair is written to `<cid>/resp_l<lambda>_s<sigma>_p<prefix>_seed<n>.mp4`, with a `meta.json` per pair
+- `--sigmas`: comma-separated start levels of the sampling (flow sigma; `1.0` = pure noise)
+- `--lambdas`: comma-separated guidance strengths (`1.0` = overwrite the x0 estimate with the chosen side)
+- `--seeds`: number of seeds per setting (seeds `0` to `N-1`)
+- `--prefix`: clip providing the frames before the violation onset, `I` (Impossible) or `P` (Possible)
 - `--gt-csv`: generate only the pairs listed in this GT CSV (defaults to `IntPhys2Timing/intphys2_gt.csv`)
 
 ### b) Inference
