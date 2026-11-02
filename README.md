@@ -15,10 +15,11 @@ Official codebase for the paper **"[PhysTrace: Interpretable Temporal Evaluation
 
 ## Overview
 
-This repository provides the evaluation code for **PhysTrace**, which localizes *when* a video breaks physical consistency instead of returning a single video-level score.
+This repository provides the code for **PhysTrace**, a training-free framework that assesses physical consistency by tracking the alignment between history-conditioned expectations and video observations over time.
 
-- **Sliding-window scoring**: each video is split into overlapping windows, scored by a video-text alignment model (PE-AV-Large by default) and a reasoning MLLM (Qwen3.8-27B by default).
-- **IntPhys2-Timing**: temporal violation annotations (onset / end) on top of IntPhys2, covering the four physical attributes `solidity`, `permanence`, `immutability`, and `continuity`.
+- **Expectation tracking**: for each window, an MLLM (Qwen3.8-27B by default) formulates an Expected State from past observations, which is compared with the video in a shared embedding space (PE-AV-Large by default) to produce a time-resolved alignment trace.
+- **IntPhys2-Timing**: temporal violation annotations (onset / end) on top of IntPhys2 for additionally evaluating temporal localization.
+- **Reference-guided masked denoising**: generates videos from mixed possible–impossible latents to assess how pretrained video generators resolve the two outcomes.
 
 ## 1. Repository Structure
 
@@ -27,7 +28,7 @@ project_root/
 ├── AlignmentModels/      # video-text alignment / MLLM code (submodules) and weights
 ├── DiffusionModels/      # video generative model code (submodules) and weights
 ├── IntPhys2Timing/       # violation GT CSVs and per-attribute prompts
-├── PhysTrace/            # core library (windowing, CLIP / MLLM scorers)
+├── PhysTrace/            # core library (history-conditioned expectation and alignment scoring)
 ├── demo/                 # interactive web demo
 ├── score/                # batch inference and scoring
 ├── requirements.txt
@@ -156,7 +157,7 @@ hf download ali-vilab/text-to-video-ms-1.7b --exclude "*.bin" --local-dir Diffus
 hf download VideoCrafter/VideoCrafter2 model.ckpt --local-dir DiffusionModels/weights/VideoCrafter2
 ```
 
-### d) Data Download: IntPhys2 (for IntPhys2-Timing)
+### d) Data Download: IntPhys2
 
 ```bash
 python3 -c "from huggingface_hub import snapshot_download; \
@@ -213,7 +214,7 @@ python3 score/run_eval.py --result-dir results/test
 
 ## 4. Evaluation for Video Generative Models
 
-Each IntPhys2 video is inverted (clean → noise) by a video generative model, and the x0 estimate decoded at each sigma is evaluated with the same pipeline as Section 3. Wan2.1 and Cosmos-Predict2 are run separately, so give each model its own output directory.
+For each IntPhys2 pair, a video generative model regenerates the masked frames from the violation onset onward, guided toward the possible or impossible clip, and the results are evaluated with PhysTrace. Run each model with its own output directory.
 
 ### a) Video Generation
 
@@ -248,6 +249,12 @@ CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_cosmos20.py \
 - `--seeds`: number of seeds per setting (seeds `0` to `N-1`)
 - `--prefix`: clip providing the frames before the violation onset, `I` (Impossible) or `P` (Possible)
 - `--gt-csv`: generate only the pairs listed in this GT CSV (defaults to `IntPhys2Timing/intphys2_gt.csv`)
+
+> **Note**  
+> The generated videos are not written in the `Main/Videos` layout that `score/run_test.py` reads, so they cannot be passed to it directly.
+
+<!-- NOTE: Previous b) Inference and c) Scoring kept for rollback.
+They read the sigma_<value> folders of the removed inversion scripts, which gen_*.py no longer writes.
 
 ### b) Inference
 
@@ -290,6 +297,7 @@ python3 score/run_eval.py --result-dir results/cosmos_test/sigma_0.50
 
 > **Note**  
 > To compare sigmas, repeat b) and c) for each `sigma_<value>` folder, including `sigma_0.00_INPUT` as the reference.
+-->
 
 ## Citation
 
