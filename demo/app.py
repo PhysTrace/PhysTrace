@@ -149,11 +149,11 @@ def _add_demo_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument('--window-seconds', type=float, default=2.0)
     group.add_argument('--hop-seconds', type=float, default=1.0, help='0 < hop <= window')
     group.add_argument('--intphys2-dir', type=Path, required=True,
-                       help='IntPhys2 root holding Main/ (Main/Videos and Main/metadata.csv give the pair list)')
+                       help='IntPhys2 root holding Main/Videos')
     group.add_argument('--result-dir', dest='output', type=Path, default=ROOT / 'demo' / 'results',
                        help='where results.csv and trials.csv live')
     group.add_argument('--gt-csv', type=Path, default=GT_CSV,
-                       help='violation GT drawn on the Impossible chart (demo/gt/build_gt_csv.py writes it)')
+                       help='the pairs listed, with their videos, metadata and the GT drawn on the Impossible chart')
     group.add_argument('--host', default='0.0.0.0')
     group.add_argument('--port', type=int, default=7874)
 

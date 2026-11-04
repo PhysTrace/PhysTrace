@@ -54,7 +54,7 @@ class Browser:
         self.demo, self.args = demo, args
         self.output = args.output
         self.video_dir = args.video_dir.expanduser().resolve()
-        self.pairs = load_pairs(self.video_dir, self.video_dir.parent / 'metadata.csv', args.gt_csv)
+        self.pairs = load_pairs(self.video_dir, args.gt_csv)
         # Drawn on the Impossible chart to judge a run; the analysis never sees it.
         gt = load_gt(args.gt_csv)
         for pair in self.pairs:

@@ -52,6 +52,8 @@ def for_page(result: dict, predictor, scorer) -> dict:
         'trusted_history': result['trusted_history'],
         # The same history as the model's chat template renders it: role tokens instead of the
         # {"role", "content"} records the code passes around. Rendered with the run's own processor.
-        'trusted_history_text': predictor.processor.apply_chat_template(result['trusted_history'], tokenize=False),
+        'trusted_history_text': (predictor.processor.apply_chat_template(result['trusted_history'], tokenize=False)
+                                 if len(result['trusted_history']) > 1
+                                 else predictor.render_system_turn(result['trusted_history'][0]['content'])),
         'model_input_system': result['model_input_system'],
     }

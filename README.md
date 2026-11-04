@@ -97,13 +97,7 @@ hf download Qwen/Qwen3.8-27B-FP8 --local-dir AlignmentModels/weights/Qwen3.8-27B
 ```bash
 hf download Wan-AI/Wan2.1-T2V-1.3B --local-dir DiffusionModels/weights/Wan2.1-T2V-1.3B
 
-hf download nvidia/Cosmos-Predict2-2B-Video2World \
-    --local-dir DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World \
-    --include config.json model_index.json model-480p-16fps.pt "scheduler/*" "text_encoder/*" "tokenizer/*" "vae/*"
-
-# Cosmos-Predict2 loads T5 with from_pretrained(<dir>), so the tokenizer must sit beside the text encoder weights
-M=DiffusionModels/weights/cosmos/nvidia/Cosmos-Predict2-2B-Video2World
-cp $M/tokenizer/{special_tokens_map.json,spiece.model,tokenizer.json,tokenizer_config.json} $M/text_encoder/
+hf download nvidia/Cosmos-Predict2-2B-Video2World --include "model-480p-16fps.pt" "config.json" "model_index.json" "scheduler/*" "text_encoder/*" "tokenizer/*" "vae/*" --local-dir DiffusionModels/weights/Cosmos-Predict2-2B-Video2World
 ```
 
 **Optional Models**
@@ -175,7 +169,7 @@ CUDA_VISIBLE_DEVICES=0 python3 demo/app.py \
     --port 1535
 ```
 
-- `--intphys2-dir`: IntPhys2 root (uses `Main/Videos` and `Main/metadata.csv`; the CLIP cache `Main/videos-npz` is created beside them)
+- `--intphys2-dir`: IntPhys2 root (uses `/Path/To/IntPhys2/Main/Videos` and `/Path/To/IntPhys2/Main/metadata.csv`; the CLIP cache `/Path/To/IntPhys2/Main/videos-npz` is created beside them)
 - `--result-dir`: where `results.csv` / `trials.csv` are written
 - `--gt-csv`: violation GT drawn on the UI chart (defaults to `IntPhys2Timing/intphys2_gt.csv`)
 - `--mllm-backend`: `qwen3.8-27b` (default), `qwen3-vl-thinking`, `qwen3-vl-32b-thinking`, `cosmos-reason2`
@@ -214,7 +208,7 @@ python3 score/run_eval.py --result-dir results/test
 
 ## 4. Evaluation for Video Generative Models
 
-For each IntPhys2 pair, a video generative model regenerates the masked frames from the violation onset onward, guided toward the possible or impossible clip, and the results are evaluated with PhysTrace. Run each model with its own output directory.
+For each pair of the full IntPhys2-Timing dataset, a video generative model regenerates the masked frames from the violation onset onward, guided toward the possible or impossible clip, and the results are evaluated with PhysTrace. Run each model with its own output directory.
 
 ### a) Video Generation
 
@@ -224,10 +218,9 @@ For each IntPhys2 pair, a video generative model regenerates the masked frames f
 CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_wan.py \
     -i /Path/To/IntPhys2 \
     -o results/wan \
-    --sigmas 0.5,0.8,1.0 \
-    --lambdas 0.5,1.0 \
-    --seeds 2 \
-    --prefix I
+    --gt-csv IntPhys2Timing/intphys2_gt_full.csv \
+    --sigmas 0.8 --lambdas 0.5 --seeds 0,1 --prefix I --sigma-hard 1 \
+    --overlap half
 ```
 
 **Cosmos-Predict2-2B**
@@ -236,68 +229,42 @@ CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_wan.py \
 CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_cosmos20.py \
     -i /Path/To/IntPhys2 \
     -o results/cosmos \
-    --sigmas 0.5,0.8,1.0 \
-    --lambdas 0.5,1.0 \
-    --seeds 2 \
-    --prefix I
+    --gt-csv IntPhys2Timing/intphys2_gt_full.csv \
+    --sigmas 0.8 --lambdas 0.5 --seeds 0,1 --prefix I --sigma-hard 1 \
+    --overlap half
 ```
 
-- `-i`: IntPhys2 root (same as `--intphys2-dir` above) or a folder of `.mp4` files
-- `-o`: output directory; each pair is written to `<cid>/resp_l<lambda>_s<sigma>_p<prefix>_seed<n>.mp4`, with a `meta.json` per pair
+- `-i`: IntPhys2 root (same as `--intphys2-dir` above)
+- `-o`: output directory; each pair is written to `<cid>/resp_l<lambda>_s<sigma>_p<prefix>_seed<n>.mp4` with a `meta.json`, and each output setting is also collected into `sets/<output name>/Main` in the IntPhys2 layout
+- `--gt-csv`: GT CSV of the pairs to generate (`intphys2_gt_full.csv` = the full IntPhys2-Timing dataset)
 - `--sigmas`: comma-separated start levels of the sampling (flow sigma; `1.0` = pure noise)
 - `--lambdas`: comma-separated guidance strengths (`1.0` = overwrite the x0 estimate with the chosen side)
-- `--seeds`: number of seeds per setting (seeds `0` to `N-1`)
+- `--seeds`: comma-separated seeds
 - `--prefix`: clip providing the frames before the violation onset, `I` (Impossible) or `P` (Possible)
-- `--gt-csv`: generate only the pairs listed in this GT CSV (defaults to `IntPhys2Timing/intphys2_gt.csv`)
+- `--sigma-hard`: fraction of the steps after which the choice between P and I is fixed (`1` = only the last step)
+- `--overlap`: frames shared by consecutive windows (`0` = none; `half` = 41 of 81 frames for Wan, 45 of 93 frames for Cosmos)
 
-> **Note**  
-> The generated videos are not written in the `Main/Videos` layout that `score/run_test.py` reads, so they cannot be passed to it directly.
+### b) Physically Impossible Classification Rates
 
-<!-- NOTE: Previous b) Inference and c) Scoring kept for rollback.
-They read the sigma_<value> folders of the removed inversion scripts, which gen_*.py no longer writes.
+Run [3. b) Inference](#b-inference) twice with the same settings, once on a generated set and once on the original videos as the reference:
 
-### b) Inference
+- Generated: `--intphys2-dir results/wan/sets/resp_l0.5_s0.80_pI_seed0 --result-dir results/test_wan_l0.5_s0.80_seed0`
+- Reference: `--intphys2-dir /Path/To/IntPhys2 --result-dir results/test_orig`
 
-Pass one sigma folder of the generation output as `--intphys2-dir`.
-
-**Wan2.1-T2V-1.3B**
+Then compare the two runs:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
-    --intphys2-dir results/wan/sigma_0.50 \
-    --result-dir results/wan_test/sigma_0.50 \
-    --window-seconds 2 --hop-seconds 1 \
-    --clip-frames 16 --mllm-frames 16 \
-    --categories solidity=BoxSoldity
+python3 score/run_compare.py \
+    --result-dir results/test_wan_l0.5_s0.80_seed0 \
+    --reference-dir results/test_orig \
+    --gt-csv IntPhys2Timing/intphys2_gt_full.csv
 ```
 
-**Cosmos-Predict2-2B**
+- `--result-dir`: inference result of the generated set
+- `--reference-dir`: inference result of the original videos
+- `--gt-csv`: GT CSV of the full IntPhys2-Timing dataset, the same one used for the generation
 
-```bash
-CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
-    --intphys2-dir results/cosmos/sigma_0.50 \
-    --result-dir results/cosmos_test/sigma_0.50 \
-    --window-seconds 2 --hop-seconds 1 \
-    --clip-frames 18 --mllm-frames 18 \
-    --categories solidity=BoxSoldity
-```
-
-- `--intphys2-dir`: a `sigma_<value>` folder written by the generation step
-- `--clip-frames`, `--mllm-frames`: lower than in Section 3, since the generated videos have a lower frame rate (Wan: 7.5 fps, Cosmos: 93 frames per clip)
-- The other options are the same as [3. b) Inference](#b-inference)
-
-### c) Scoring
-
-```bash
-python3 score/run_eval.py --result-dir results/wan_test/sigma_0.50
-python3 score/run_eval.py --result-dir results/cosmos_test/sigma_0.50
-```
-
-- `--result-dir`: result directory of the inference above (one per model and sigma)
-
-> **Note**  
-> To compare sigmas, repeat b) and c) for each `sigma_<value>` folder, including `sigma_0.00_INPUT` as the reference.
--->
+A generated clip is classified as impossible when its lowest window score is below that of the pair's original Possible clip. The report is written to `<result-dir>/eval_compare.json`.
 
 ## Citation
 

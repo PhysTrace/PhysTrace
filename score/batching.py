@@ -57,20 +57,28 @@ class BatchLLM:
             print(f'[dbg] unmatched output id {output.request_id!r}', flush=True)
 
     def _loop(self) -> None:
-        """Admit requests and step the engine forever."""
+        """Admit requests and step the engine until it fails."""
         engine = self.llm.llm_engine
         while True:
             self._admit(block=not self.pending)
             try:
                 outputs = engine.step()
-            except Exception as error:   # every waiting caller gets it
-                for future in self.pending.values():
-                    future.set_exception(error)
-                self.pending.clear()
-                continue
+            except Exception as error:   # every caller, waiting or still to come, gets it
+                self._fail_forever(error)
             for output in outputs:
                 if output.finished:
                     self._finish(output)
+
+    def _fail_forever(self, error: Exception) -> None:
+        """Fail every pending and every later request with `error`; never returns."""
+        # vLLM's client hands the engine's death to one step() only: the next step() blocks on its output
+        # queue forever, so the engine is never stepped again and the callers still to come would wait on it.
+        for future in self.pending.values():
+            future.set_exception(error)
+        self.pending.clear()
+        while True:
+            _, _, future = self.requests.get()
+            future.set_exception(error)
 
 
 class Locked:

@@ -1,5 +1,8 @@
 """Run the demo's pipeline on every IntPhys2 pair and store the trials; `--result-dir` opens in the demo.
 
+Only the Impossible side is analyzed, so a dataset without Possible clips works; `--paired` analyzes both sides,
+`--possible-only` the Possible side alone (to pair with an Impossible-only run in the same result dir).
+
 Resumable; a CUDA or vLLM engine failure exits with 3. `--threads` pairs walk at once and share one vLLM engine.
 E.g. `CUDA_VISIBLE_DEVICES=0 python score/run_test.py --intphys2-dir <IntPhys2 root> --limit 8`.
 """
@@ -118,9 +121,14 @@ def _add_batch_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument('--status-interval', type=float, default=30,
                        help='seconds between the progress summary lines; 0 = off (default: %(default)s)')
     group.add_argument('--intphys2-dir', type=Path, required=True,
-                       help='IntPhys2 root holding Main/ (Main/Videos and Main/metadata.csv give the pair list)')
+                       help='IntPhys2 root holding Main/Videos')
     group.add_argument('--gt-csv', type=Path, default=GT_CSV,
-                       help='the pairs this run covers are the ones this GT CSV lists (default: %(default)s)')
+                       help='the pairs this run covers, with their videos and metadata (default: %(default)s)')
+    group.add_argument('--paired', action='store_true',
+                       help='analyze Possible as well, on complete pairs only (default: Impossible only)')
+    group.add_argument('--possible-only', action='store_true',
+                       help='analyze Possible alone, on complete pairs only; run_eval.py --paired joins it to the '
+                            'Impossible-only trials of the same result dir')
     group.add_argument('--attributes', nargs='+', choices=ATTRIBUTES, default=list(ATTRIBUTES),
                        help='only pairs of these conditions (default: all)')
     group.add_argument('--categories', nargs='+', type=parse_category_filter, metavar='ATTRIBUTES=CATEGORIES',
@@ -182,6 +190,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error('--shard must be in [0, --nshards)')
     if args.threads < 1:
         parser.error('--threads must be >= 1')
+    if args.paired and args.possible_only:
+        parser.error('--paired and --possible-only exclude each other')
     args.backend = BACKENDS[args.mllm_backend]
     args.mllm_model_dir = (args.mllm_model_dir.expanduser().resolve() if args.mllm_model_dir
                            else Path(args.backend.path(Path('AlignmentModels/weights'))))
@@ -189,10 +199,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args.gt_csv = args.gt_csv.expanduser().resolve()
     args.npz_dir = default_cache_dir(args.video_dir)
     args.result_dir = args.result_dir.expanduser().resolve()
+    args.sides = list(SIDES) if args.paired else ['good'] if args.possible_only else ['bad']
     args.categories = merge_category_filters(args.categories) if args.categories else None
     if args.categories:
         try:
-            check_categories(args.categories, load_pairs(args.video_dir, gt_csv=args.gt_csv))
+            check_categories(args.categories,
+                             load_pairs(args.video_dir, gt_csv=args.gt_csv, paired=needs_possible(args)))
         except ValueError as error:
             parser.error(str(error))
     if args.clip_frames is None:
@@ -204,12 +216,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def needs_possible(args: argparse.Namespace) -> bool:
+    """Whether the run analyzes Possible videos, so only complete pairs can be taken."""
+    return 'good' in args.sides
+
+
 def run_key(args: argparse.Namespace) -> dict:
     """What makes two stored trials the same run, for resuming."""
     return dict(window_seconds=float(args.window_seconds), hop_seconds=float(args.hop_seconds),
                 clip_model=args.clip_model, clip_frames=args.clip_frames, mllm_backend=args.mllm_backend,
                 prompt_set=args.prompt_set.name, num_prompts=args.num_prompts, history_windows=args.history_windows,
-                lowest_windows=args.lowest_windows)
+                lowest_windows=args.lowest_windows, sides=args.sides)
 
 
 def _trial_key(params: dict) -> dict:
@@ -218,19 +235,18 @@ def _trial_key(params: dict) -> dict:
                 clip_model=params.get('clip_model'), clip_frames=params.get('clip_frames'),
                 mllm_backend=params.get('mllm_backend'), prompt_set=params.get('prompt_set'),
                 num_prompts=params['prompts']['num_prompts'], history_windows=params['prompts']['history_windows'],
-                lowest_windows=params['prompts']['lowest_windows'])
+                lowest_windows=params['prompts']['lowest_windows'], sides=params.get('sides'))
 
 
 def stored_groups(result_dir: Path, key: dict) -> set[str]:
-    """Pairs trials.csv already holds, both sides, for exactly this run."""
+    """Pairs trials.csv already holds for exactly this run."""
     path = result_dir / 'trials.csv'
     if not path.is_file():
         return set()
     done = set()
     with path.open(newline='', encoding='utf-8') as stream:
         for row in csv.DictReader(stream):
-            params = json.loads(row['trial_json'])['params']
-            if _trial_key(params) == key and set(params.get('sides', [])) == set(SIDES):
+            if _trial_key(json.loads(row['trial_json'])['params']) == key:
                 done.add(row['group'])
     return done
 
@@ -257,7 +273,7 @@ def record_failure(result_dir: Path, key: dict, pair: dict, error: BaseException
 
 def run_pairs(args: argparse.Namespace) -> list[dict]:
     """The sorted pairs this run covers: the chosen conditions and categories."""
-    pairs = [pair for pair in load_pairs(args.video_dir, gt_csv=args.gt_csv)
+    pairs = [pair for pair in load_pairs(args.video_dir, gt_csv=args.gt_csv, paired=needs_possible(args))
              if pair['attribute'] in args.attributes]
     if args.categories:
         pairs = [pair for pair in pairs if pair['category'] in args.categories.get(pair['attribute'], ())]
@@ -330,20 +346,20 @@ def analyze_side(video: Path, prompts, models: tuple, args: argparse.Namespace, 
 
 def analyze_pair(pair: dict, models: tuple, args: argparse.Namespace, progress: Progress, position: int,
                  total: int) -> dict:
-    """Both sides, then the pair as the trial demo.server stores for a two-sided run.
+    """The run's sides, then the pair as the trial demo.server stores it.
 
     A side that raises leaves the pair unstored, so it is analyzed again on a later run.
     """
     prompts = default_prompts(pair['attribute'], args)
     results, ids = {}, {}
-    for side, label in SIDES.items():
+    for side in args.sides:
         video = args.video_dir / f"{pair[f'{side}_name']}.mp4"
-        report = progress.start(pair['group'], label[:4], position, total)
+        report = progress.start(pair['group'], SIDES[side][:4], position, total)
         results[side], ids[side] = analyze_side(video, prompts, models, args, report)
     trial = dict(id=uuid.uuid4().hex, group=pair['group'], pair=pair,
                  created_at=datetime.now(timezone.utc).isoformat(),
                  params=dict(window_seconds=args.window_seconds, hop_seconds=args.hop_seconds,
-                             sides=list(SIDES), prompts=asdict(prompts),
+                             sides=args.sides, prompts=asdict(prompts),
                              clip_model=args.clip_model, clip_frames=args.clip_frames,
                              mllm_backend=args.mllm_backend, prompt_set=run_key(args)['prompt_set']),
                  results=results, files=dict.fromkeys(results, TRIAL_FILES),
