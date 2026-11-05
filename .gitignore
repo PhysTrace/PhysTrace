@@ -3,6 +3,7 @@ output/*
 # AlignmentModels/weights/*
 DiffusionModels/*
 AlignmentModels/*
+!AlignmentModels/InternVideo2/
 .nfs*
 keep
 **/__pycache__
