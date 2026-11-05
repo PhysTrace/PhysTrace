@@ -38,7 +38,7 @@ project_root/
 ### Main entry points
 
 - `demo/app.py`: interactive demo (browser UI) for inspecting per-window results
-- `score/run_test.py`: batch inference over every IntPhys2 pair
+- `score/run_test.py`: batch inference over the IntPhys2 pairs listed in the GT CSV (`--gt-csv`)
 - `score/run_eval.py`: scoring of the inference results against the IntPhys2-Timing GT
 
 ## 2. Installation
@@ -187,6 +187,8 @@ CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
 ```
 
 - `--intphys2-dir`, `--result-dir`: same as the demo (same result format, so the result directory can be opened in the demo)
+- `--gt-csv`: pairs to run (defaults to `IntPhys2Timing/intphys2_gt.csv`; `IntPhys2Timing/intphys2_gt_full.csv` for the full IntPhys2-Timing dataset)
+- `--paired`, `--possible-only`: also / only run the Possible videos (default: Impossible videos only)
 - `--window-seconds`, `--hop-seconds`: window length and hop between windows, in seconds
 - `--clip-frames`, `--mllm-frames`: frames fed to CLIP / the MLLM per window
 - `--categories`: limit the categories run per attribute, e.g. `solidity=BoxSoldity` (default: every category)
@@ -246,12 +248,16 @@ CUDA_VISIBLE_DEVICES=0 python3 PhysTrace/gen_cosmos20.py \
 
 ### b) Physically Impossible Classification Rates
 
-Run [3. b) Inference](#b-inference) twice with the same settings, once on a generated set and once on the original videos as the reference:
+After a), run [3. b) Inference](#b-inference) on a generated set over the full IntPhys2-Timing dataset:
 
-- Generated: `--intphys2-dir results/wan/sets/resp_l0.5_s0.80_pI_seed0 --result-dir results/test_wan_l0.5_s0.80_seed0`
-- Reference: `--intphys2-dir /Path/To/IntPhys2 --result-dir results/test_orig`
+```bash
+CUDA_VISIBLE_DEVICES=0 python3 score/run_test.py \
+    --intphys2-dir results/wan/sets/resp_l0.5_s0.80_pI_seed0 \
+    --result-dir results/test_wan_l0.5_s0.80_seed0 \
+    --gt-csv IntPhys2Timing/intphys2_gt_full.csv
+```
 
-Then compare the two runs:
+Use the same window and frame settings as the reference below. Then compare it with the reference:
 
 ```bash
 python3 score/run_compare.py \
@@ -261,7 +267,7 @@ python3 score/run_compare.py \
 ```
 
 - `--result-dir`: inference result of the generated set
-- `--reference-dir`: inference result of the original videos
+- `--reference-dir`: an existing inference result in which the original Possible videos of the full IntPhys2-Timing dataset are already scored (e.g. 3. b) with `--possible-only --gt-csv IntPhys2Timing/intphys2_gt_full.csv`)
 - `--gt-csv`: GT CSV of the full IntPhys2-Timing dataset, the same one used for the generation
 
 A generated clip is classified as impossible when its lowest window score is below that of the pair's original Possible clip. The report is written to `<result-dir>/eval_compare.json`.
