@@ -4,6 +4,9 @@
   <a href="https://arxiv.org/abs/2610.31429">
     <img src="https://img.shields.io/badge/Paper-arXiv-b31b1b" alt="arXiv">
   </a>
+  <a href="https://phystrace.github.io/PhysTrace.io/">
+    <img src="https://img.shields.io/badge/Project%20Page-Samples-green" alt="Project Page">
+  </a>
 </p>
 
 Official codebase for the paper **"[PhysTrace: Interpretable Temporal Evaluation of Physical Consistency in Video Generative Models](https://arxiv.org/abs/2610.31429)"**.
